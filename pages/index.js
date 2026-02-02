@@ -2,8 +2,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { createClient } from '@supabase/supabase-js';
 import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, Lock } from 'lucide-react';
 
-const supabaseUrl = 'IDE_A_PROJECT_URL';
-const supabaseKey = 'IDE_AZ_ANON_PUBLIC_KEY';
+const supabaseUrl = 'https://scijtstwpbgxtsdqzowc.supabase.co';
+const supabaseKey = 'sb_publishable_jVuKo_UCsRvxdGbmYvGo-Q_cib0YWVv';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 export default function FishingCompetition() {
