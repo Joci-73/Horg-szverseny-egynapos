@@ -28,7 +28,7 @@ export default function FishingCompetition() {
   const [editNagyhal, setEditNagyhal] = useState('');
   const [editAprohal, setEditAprohal] = useState('');
   const [editDarabszam, setEditDarabszam] = useState('');
-
+const [showAllResults, setShowAllResults] = useState(false);
   useEffect(() => {
     checkUser();
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
@@ -267,6 +267,13 @@ export default function FishingCompetition() {
       .filter(c => c.biggestNagyhal > 0)
       .sort((a, b) => b.biggestNagyhal - a.biggestNagyhal)
       .slice(0, 3);
+
+    const top6Mindosszesen = competitors
+      .filter(c => c.mindosszesen > 0)
+      .sort((a, b) => b.mindosszesen - a.mindosszesen);
+
+    return { top3Nagyhal, top6Mindosszesen };
+  }, [competitors]);
 
     const top6Mindosszesen = competitors
       .filter(c => c.mindosszesen > 0)
@@ -750,19 +757,46 @@ export default function FishingCompetition() {
           <div className="bg-white rounded-lg shadow-lg p-4">
             <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2">
               <Trophy className="w-5 h-5 text-blue-500" />
-              Top 6 Mind Összesen
+              Mind Összesen Eredmények
             </h3>
             {results.top6Mindosszesen.length > 0 ? (
-              <div className="space-y-2">
-                {results.top6Mindosszesen.map((c, i) => (
-                  <div key={c.id} className={i === 0 ? 'flex justify-between items-center p-2 rounded bg-yellow-100 border-2 border-yellow-400' : i === 1 ? 'flex justify-between items-center p-2 rounded bg-gray-100 border-2 border-gray-400' : i === 2 ? 'flex justify-between items-center p-2 rounded bg-orange-100 border-2 border-orange-400' : 'flex justify-between items-center p-2 rounded bg-gray-50'}>
-                    <div className="flex items-center gap-2">
-                      <span className="text-xl font-bold text-gray-600">{i + 1}.</span>
-                      <span className="font-semibold">{c.name}</span>
+              <div>
+                <div className="space-y-2">
+                  {results.top6Mindosszesen.slice(0, 6).map((c, i) => (
+                    <div key={c.id} className={i === 0 ? 'flex justify-between items-center p-2 rounded bg-yellow-100 border-2 border-yellow-400' : i === 1 ? 'flex justify-between items-center p-2 rounded bg-gray-100 border-2 border-gray-400' : i === 2 ? 'flex justify-between items-center p-2 rounded bg-orange-100 border-2 border-orange-400' : 'flex justify-between items-center p-2 rounded bg-gray-50'}>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xl font-bold text-gray-600">{i + 1}.</span>
+                        <span className="font-semibold">{c.name}</span>
+                      </div>
+                      <span className="font-bold text-blue-700 text-lg">{c.mindosszesen} g</span>
                     </div>
-                    <span className="font-bold text-blue-700 text-lg">{c.mindosszesen} g</span>
+                  ))}
+                </div>
+
+                {results.top6Mindosszesen.length > 6 && (
+                  <div className="mt-3">
+                    <button 
+                      onClick={() => setShowAllResults(!showAllResults)} 
+                      className="w-full py-2 text-sm text-blue-600 font-semibold hover:bg-blue-50 rounded border border-blue-200 flex items-center justify-center gap-2"
+                    >
+                      {showAllResults ? '▲ Kevesebbet mutass' : '▼ Több eredmény (' + (results.top6Mindosszesen.length - 6) + ' több)'}
+                    </button>
+
+                    {showAllResults && (
+                      <div className="space-y-1 mt-2 border-t border-gray-200 pt-2">
+                        {results.top6Mindosszesen.slice(6).map((c, i) => (
+                          <div key={c.id} className="flex justify-between items-center p-2 rounded bg-gray-50 hover:bg-gray-100">
+                            <div className="flex items-center gap-2">
+                              <span className="text-sm font-bold text-gray-500">{i + 7}.</span>
+                              <span className="text-sm font-semibold text-gray-700">{c.name}</span>
+                            </div>
+                            <span className="font-bold text-blue-600 text-sm">{c.mindosszesen} g</span>
+                          </div>
+                        ))}
+                      </div>
+                    )}
                   </div>
-                ))}
+                )}
               </div>
             ) : (
               <p className="text-gray-400 text-center py-6 text-sm">Még nincs rögzített mérés</p>
