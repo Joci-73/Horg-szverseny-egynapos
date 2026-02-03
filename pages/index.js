@@ -29,6 +29,7 @@ export default function FishingCompetition() {
   const [editAprohal, setEditAprohal] = useState('');
   const [editDarabszam, setEditDarabszam] = useState('');
 const [showAllResults, setShowAllResults] = useState(false);
+  
   useEffect(() => {
     checkUser();
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
