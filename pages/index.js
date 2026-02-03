@@ -273,15 +273,7 @@ const [showAllResults, setShowAllResults] = useState(false);
       .sort((a, b) => b.mindosszesen - a.mindosszesen);
 
     return { top3Nagyhal, top6Mindosszesen };
-  }, [competitors]);
-
-    const top6Mindosszesen = competitors
-      .filter(c => c.mindosszesen > 0)
-      .sort((a, b) => b.mindosszesen - a.mindosszesen)
-      .slice(0, 6);
-
-    return { top3Nagyhal, top6Mindosszesen };
-  }, [competitors]);
+  }, [competitors]);   
   if (showCompetitionList) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
