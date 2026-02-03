@@ -487,7 +487,7 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* FELHASZNÁLÓI NÉZET */}
+{/* FELHASZNÁLÓI NÉZET */}
         {!user && (
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
@@ -505,22 +505,85 @@ export default function FishingCompetition() {
                 </thead>
                 <tbody>
                   {competitors.map((competitor, index) => (
-                    <tr key={competitor.id} className={index % 2 === 0 ? 'bg-white' : 'bg-gray-50'}>
-                      <td className="px-2 py-2 text-center font-bold text-gray-600">{index + 1}</td>
-                      <td className="px-2 py-2 font-semibold text-gray-800">{competitor.name}</td>
-                      <td className="px-2 py-2 text-center">
-                        <span className="font-bold text-green-700">{competitor.totalNagyhal} g</span>
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className="font-bold text-blue-700">{competitor.totalAprohal} g</span>
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{competitor.mindosszesen} g</span>
-                      </td>
-                      <td className="px-2 py-2 text-center">
-                        <span className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">{competitor.totalDarabszam} db</span>
-                      </td>
-                    </tr>
+                    <React.Fragment key={competitor.id}>
+                      {/* Fő sor - Névre kattintható */}
+                      <tr 
+                        className={index % 2 === 0 ? 'bg-white hover:bg-green-50 cursor-pointer' : 'bg-gray-50 hover:bg-green-50 cursor-pointer'}
+                        onClick={() => setEditingId(editingId === competitor.id ? null : competitor.id)}
+                      >
+                        <td className="px-2 py-2 text-center font-bold text-gray-600">{index + 1}</td>
+                        <td className="px-2 py-2">
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-gray-800">{competitor.name}</span>
+                            {competitor.measurements.length > 0 && (
+                              <span className="text-xs text-blue-600">
+                                {editingId === competitor.id ? '▲' : '▼'}
+                              </span>
+                            )}
+                          </div>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className="font-bold text-green-700">{competitor.totalNagyhal} g</span>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className="font-bold text-blue-700">{competitor.totalAprohal} g</span>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{competitor.mindosszesen} g</span>
+                        </td>
+                        <td className="px-2 py-2 text-center">
+                          <span className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">{competitor.totalDarabszam} db</span>
+                        </td>
+                      </tr>
+                      {/* Kinyitható részlet - mérések */}
+                      {editingId === competitor.id && competitor.measurements.length > 0 && (
+                        <tr>
+                          <td colSpan={6} className="p-0">
+                            <div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
+                              <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Mérések history</p>
+                              <table className="w-full text-xs">
+                                <thead>
+                                  <tr className="text-gray-500 border-b border-green-200">
+                                    <th className="text-left py-1 font-semibold">#</th>
+                                    <th className="text-left py-1 font-semibold">Időpont</th>
+                                    <th className="text-center py-1 font-semibold">Nagyhal (g)</th>
+                                    <th className="text-center py-1 font-semibold">Apróhal (g)</th>
+                                    <th className="text-center py-1 font-semibold">Darabszám</th>
+                                    <th className="text-center py-1 font-semibold">Sor összesen (g)</th>
+                                  </tr>
+                                </thead>
+                                <tbody>
+                                  {competitor.measurements.map((m, mIndex) => {
+                                    const date = new Date(m.created_at);
+                                    const timeStr = String(date.getHours()).padStart(2, '0') + ':' + String(date.getMinutes()).padStart(2, '0');
+                                    const dateStr = date.getFullYear() + '.' + String(date.getMonth() + 1).padStart(2, '0') + '.' + String(date.getDate()).padStart(2, '0');
+                                    return (
+                                      <tr key={m.id} className="border-b border-green-100 last:border-b-0">
+                                        <td className="py-1 text-gray-500">{mIndex + 1}.</td>
+                                        <td className="py-1 text-gray-500">{dateStr + ' ' + timeStr}</td>
+                                        <td className="py-1 text-center">{m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : <span className="text-gray-300">-</span>}</td>
+                                        <td className="py-1 text-center">{m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : <span className="text-gray-300">-</span>}</td>
+                                        <td className="py-1 text-center">{m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam} db</span> : <span className="text-gray-300">-</span>}</td>
+                                        <td className="py-1 text-center"><span className="text-yellow-700 font-bold">{m.nagyhal + m.aprohal} g</span></td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                                <tfoot>
+                                  <tr className="border-t-2 border-green-300 font-bold text-gray-700">
+                                    <td colSpan={2} className="py-1">Összesen:</td>
+                                    <td className="py-1 text-center text-green-700">{competitor.totalNagyhal} g</td>
+                                    <td className="py-1 text-center text-blue-700">{competitor.totalAprohal} g</td>
+                                    <td className="py-1 text-center text-purple-700">{competitor.totalDarabszam} db</td>
+                                    <td className="py-1 text-center text-yellow-700">{competitor.mindosszesen} g</td>
+                                  </tr>
+                                </tfoot>
+                              </table>
+                            </div>
+                          </td>
+                        </tr>
+                      )}
+                    </React.Fragment>
                   ))}
                 </tbody>
               </table>
