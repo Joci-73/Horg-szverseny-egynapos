@@ -273,7 +273,8 @@ const [showAllResults, setShowAllResults] = useState(false);
       .sort((a, b) => b.mindosszesen - a.mindosszesen);
 
     return { top3Nagyhal, top6Mindosszesen };
-  }, [competitors]);   
+  }, [competitors]);  
+  
   if (showCompetitionList) {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
