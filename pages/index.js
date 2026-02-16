@@ -66,7 +66,7 @@ export default function FishingCompetition() {
         supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('visited_at', todayStart),
         supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('visited_at', weekStart),
         supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('device', 'mobil'),
-        supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('device', 'PC'),
+        supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('device', 'pc'),
       ]);
       setPageViews({ today: today || 0, week: week || 0, total: total || 0, mobil: mobilTotal || 0, pc: pcTotal || 0 });
     } catch (err) { console.error('Látogatók betöltési hiba:', err); }
