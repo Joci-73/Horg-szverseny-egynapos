@@ -36,8 +36,10 @@ export default function FishingCompetition() {
   const [archivedCompetitors, setArchivedCompetitors] = useState([]);
   const [archivedExpandedId, setArchivedExpandedId] = useState(null);
   const [showShareToast, setShowShareToast] = useState(false);
+  const [pageViews, setPageViews] = useState({ today: 0, week: 0, total: 0 });
 
   useEffect(() => {
+    trackVisit();
     checkUser();
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
@@ -45,6 +47,28 @@ export default function FishingCompetition() {
     });
     return () => { authListener?.subscription?.unsubscribe(); };
   }, []);
+
+  const trackVisit = async () => {
+    try {
+      const device = /Mobi|Android/i.test(navigator.userAgent) ? 'mobil' : 'PC';
+      await supabase.from('page_views').insert([{ device }]);
+      await loadPageViews();
+    } catch (err) { console.error('Látogatás rögzítési hiba:', err); }
+  };
+
+  const loadPageViews = async () => {
+    try {
+      const now = new Date();
+      const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
+      const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString();
+      const [{ count: total }, { count: today }, { count: week }] = await Promise.all([
+        supabase.from('page_views').select('*', { count: 'exact', head: true }),
+        supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('visited_at', todayStart),
+        supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('visited_at', weekStart),
+      ]);
+      setPageViews({ today: today || 0, week: week || 0, total: total || 0 });
+    } catch (err) { console.error('Látogatók betöltési hiba:', err); }
+  };
 
   const checkUser = async () => {
     try {
@@ -559,6 +583,32 @@ export default function FishingCompetition() {
                 <button onClick={handleLogin} disabled={loading} className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400">
                   {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
                 </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* LÁTOGATÓSZÁMLÁLÓ - csak adminnak */}
+        {user && (
+          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+            <h2 className="text-lg font-bold mb-3 text-gray-800 flex items-center gap-2">
+              👁️ Látogatók Statisztikája
+              <button onClick={loadPageViews} className="ml-auto px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1">
+                <RefreshCw className="w-3 h-3" />Frissítés
+              </button>
+            </h2>
+            <div className="grid grid-cols-3 gap-3">
+              <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-blue-700">{pageViews.today}</p>
+                <p className="text-xs text-blue-500 font-semibold mt-1">Mai látogatás</p>
+              </div>
+              <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-green-700">{pageViews.week}</p>
+                <p className="text-xs text-green-500 font-semibold mt-1">Elmúlt 7 nap</p>
+              </div>
+              <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center">
+                <p className="text-2xl font-bold text-purple-700">{pageViews.total}</p>
+                <p className="text-xs text-purple-500 font-semibold mt-1">Összes látogatás</p>
               </div>
             </div>
           </div>
