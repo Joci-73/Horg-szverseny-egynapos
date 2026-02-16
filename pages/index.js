@@ -61,12 +61,14 @@ export default function FishingCompetition() {
       const now = new Date();
       const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate()).toISOString();
       const weekStart = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7).toISOString();
-      const [{ count: total }, { count: today }, { count: week }] = await Promise.all([
+      const [{ count: total }, { count: today }, { count: week }, { count: mobilTotal }, { count: pcTotal }] = await Promise.all([
         supabase.from('page_views').select('*', { count: 'exact', head: true }),
         supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('visited_at', todayStart),
         supabase.from('page_views').select('*', { count: 'exact', head: true }).gte('visited_at', weekStart),
+        supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('device', 'mobil'),
+        supabase.from('page_views').select('*', { count: 'exact', head: true }).eq('device', 'PC'),
       ]);
-      setPageViews({ today: today || 0, week: week || 0, total: total || 0 });
+      setPageViews({ today: today || 0, week: week || 0, total: total || 0, mobil: mobilTotal || 0, pc: pcTotal || 0 });
     } catch (err) { console.error('Látogatók betöltési hiba:', err); }
   };
 
@@ -597,7 +599,8 @@ export default function FishingCompetition() {
                 <RefreshCw className="w-3 h-3" />Frissítés
               </button>
             </h2>
-            <div className="grid grid-cols-3 gap-3">
+            {/* Időszak statisztikák */}
+            <div className="grid grid-cols-3 gap-3 mb-3">
               <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-blue-700">{pageViews.today}</p>
                 <p className="text-xs text-blue-500 font-semibold mt-1">Mai látogatás</p>
@@ -609,6 +612,26 @@ export default function FishingCompetition() {
               <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-purple-700">{pageViews.total}</p>
                 <p className="text-xs text-purple-500 font-semibold mt-1">Összes látogatás</p>
+              </div>
+            </div>
+            {/* Eszköz bontás */}
+            <div className="border-t border-gray-100 pt-3">
+              <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Eszköz szerinti bontás (összes)</p>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-orange-600">📱 {pageViews.mobil}</p>
+                  <p className="text-xs text-orange-500 font-semibold mt-1">Mobil látogatás</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {pageViews.total > 0 ? Math.round((pageViews.mobil / pageViews.total) * 100) : 0}%
+                  </p>
+                </div>
+                <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center">
+                  <p className="text-2xl font-bold text-gray-600">💻 {pageViews.pc}</p>
+                  <p className="text-xs text-gray-500 font-semibold mt-1">PC látogatás</p>
+                  <p className="text-xs text-gray-400 mt-0.5">
+                    {pageViews.total > 0 ? Math.round((pageViews.pc / pageViews.total) * 100) : 0}%
+                  </p>
+                </div>
               </div>
             </div>
           </div>
