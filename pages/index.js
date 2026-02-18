@@ -841,11 +841,12 @@ export default function FishingCompetition() {
                 )}
               </div>
             ) : <p className="text-gray-400 text-center py-6 text-sm">Még nincs rögzített mérés</p>}
-          </div>
-        </div>
+         </div>
+        )}
       </div>
     </div>
-</div>
+  );
+}
 
         {/* LÁTOGATÓSZÁMLÁLÓ - oldal alján, adminnak */}
         {user && (
