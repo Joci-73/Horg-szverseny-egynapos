@@ -848,7 +848,6 @@ export default function FishingCompetition() {
 
         {/* EREDMÉNYEK */}
         <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div className="bg-white rounded-lg shadow-lg p-4">
             <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal</h3>
             {results.top3Nagyhal.length > 0
               ? <div className="space-y-2">{results.top3Nagyhal.map((e, i) => (
