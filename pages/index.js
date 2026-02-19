@@ -29,19 +29,23 @@ export default function FishingCompetition() {
   const [editAprohal, setEditAprohal] = useState('');
   const [editDarabszam, setEditDarabszam] = useState('');
   const [showAllResults, setShowAllResults] = useState(false);
-  // ÚJ STATE-EK
-  const [deleteConfirm, setDeleteConfirm] = useState(null); // { id, name } - versenyző törlés megerősítés
+  const [deleteConfirm, setDeleteConfirm] = useState(null);
   const [showArchived, setShowArchived] = useState(false);
   const [archivedCompetition, setArchivedCompetition] = useState(null);
   const [archivedCompetitors, setArchivedCompetitors] = useState([]);
   const [archivedExpandedId, setArchivedExpandedId] = useState(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [pageViews, setPageViews] = useState({ today: 0, week: 0, total: 0 });
-  // Verseny részletek
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [showCompetitionInfo, setShowCompetitionInfo] = useState(false);
+
+  // ÚJ: csak akkor mutatjuk az aktuális verseny táblázatát, ha a felhasználó betöltötte
+  const [activeCompetitionLoaded, setActiveCompetitionLoaded] = useState(false);
+
+  // FIX: Versenyinfók state-je külön a főoldalhoz (frissítésálló)
+  const [mainPageInfo, setMainPageInfo] = useState({ description: '', location: '', notes: '', title: '' });
 
   useEffect(() => {
     trackVisit();
@@ -107,10 +111,13 @@ export default function FishingCompetition() {
   };
 
   const handleLogout = async () => {
-    try { await supabase.auth.signOut(); setUser(null); } catch (err) { console.error(err); }
+    try {
+      await supabase.auth.signOut();
+      setUser(null);
+      setActiveCompetitionLoaded(false);
+    } catch (err) { console.error(err); }
   };
 
-  // Versenyzők betöltése - nagyhals tömb MINDEN mérés nagyhala
   const buildCompetitors = async (competitionDbId) => {
     const { data: competitorsData, error: ce } = await supabase
       .from('competitors').select('*').eq('competition_id', competitionDbId).order('sort_order', { ascending: true });
@@ -123,24 +130,39 @@ export default function FishingCompetition() {
       const totalAprohal = meas.reduce((s, m) => s + m.aprohal, 0);
       const totalDarabszam = meas.reduce((s, m) => s + m.darabszam, 0);
       const mindosszesen = totalNagyhal + totalAprohal;
-      // FIX: MINDEN nagyhal érték belekerül a tömbbe (nem csak a max)
       const nagyhals = meas.filter(m => m.nagyhal > 0).map(m => m.nagyhal);
       return { ...c, measurements: meas, totalNagyhal, totalAprohal, totalDarabszam, mindosszesen, nagyhals };
     }));
   };
 
+  // FIX: loadCompetitions csak a főoldali infót tölti be, NEM tölti be automatikusan a versenyzőket
   const loadCompetitions = async () => {
     try {
       const { data, error } = await supabase.from('competitions').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       setCompetitions(data || []);
-      // Első AKTÍV verseny betöltése
+
+      // FIX: Csak a főoldali info (description/location/notes/title) töltődik be az első aktív versenyből
+      // a versenyzők táblázata NEM jelenik meg automatikusan
       const active = (data || []).find(c => !c.archived);
-      if (active) await loadCompetition(active.id, data);
-      else if (data && data.length > 0) await loadCompetition(data[0].id, data);
+      if (active) {
+        setMainPageInfo({
+          description: active.description || '',
+          location: active.location || '',
+          notes: active.notes || '',
+          title: active.title || 'Horgászverseny',
+        });
+        setTitle(active.title || 'Horgászverseny');
+        setCompetitionId(active.id);
+        // state-eket is beállítjuk hogy az admin szerkesztés működjön
+        setDescription(active.description || '');
+        setLocation(active.location || '');
+        setNotes(active.notes || '');
+      }
     } catch (err) { console.error('Versenyek betöltési hiba:', err); }
   };
 
+  // A versenyzőket csak akkor töltjük, ha a felhasználó explicit kéri (pl. "Versenyek" fülről)
   const loadCompetition = async (compId, allComps) => {
     try {
       setLoading(true);
@@ -148,11 +170,19 @@ export default function FishingCompetition() {
       if (ce) throw ce;
       setCompetitionId(comp.id);
       setTitle(comp.title);
+      // FIX: mindig frissen töltjük a mezőket
       setDescription(comp.description || '');
       setLocation(comp.location || '');
       setNotes(comp.notes || '');
+      setMainPageInfo({
+        description: comp.description || '',
+        location: comp.location || '',
+        notes: comp.notes || '',
+        title: comp.title,
+      });
       const built = await buildCompetitors(comp.id);
       setCompetitors(built);
+      setActiveCompetitionLoaded(true);
       setShowCompetitionList(false);
       if (allComps) setCompetitions(allComps);
     } catch (err) { console.error('Betöltési hiba:', err); }
@@ -173,13 +203,14 @@ export default function FishingCompetition() {
     finally { setLoading(false); }
   };
 
-  // FIX: Verseny lezárása → archived = true (Supabase-ben)
   const archiveCompetition = async () => {
     if (!competitionId) return;
     if (!window.confirm('Biztosan lezárod és áthelyezed a "Korábbi Versenyek" közé?\nEz után az admin visszaállíthatja ha szükséges.')) return;
     try {
       const { error } = await supabase.from('competitions').update({ archived: true }).eq('id', competitionId);
       if (error) throw error;
+      setActiveCompetitionLoaded(false);
+      setCompetitors([]);
       await loadCompetitions();
     } catch (err) { alert('Hiba: ' + err.message); }
   };
@@ -198,8 +229,8 @@ export default function FishingCompetition() {
     try {
       const now = new Date();
       const dateStr = now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0');
-      const { data, error } = await supabase.from('competitions').insert([{ 
-        title: 'Horgászverseny - ' + dateStr, 
+      const { data, error } = await supabase.from('competitions').insert([{
+        title: 'Horgászverseny - ' + dateStr,
         archived: false,
         description: '',
         location: '',
@@ -211,7 +242,9 @@ export default function FishingCompetition() {
       setDescription('');
       setLocation('');
       setNotes('');
+      setMainPageInfo({ description: '', location: '', notes: '', title: data[0].title });
       setCompetitors([]);
+      setActiveCompetitionLoaded(false);
       await loadCompetitions();
       setShowCompetitionList(false);
     } catch (err) { alert('Hiba: ' + err.message); }
@@ -222,6 +255,10 @@ export default function FishingCompetition() {
     try {
       const { error } = await supabase.from('competitions').delete().eq('id', compId);
       if (error) throw error;
+      if (compId === competitionId) {
+        setActiveCompetitionLoaded(false);
+        setCompetitors([]);
+      }
       await loadCompetitions();
     } catch (err) { alert('Hiba: ' + err.message); }
   };
@@ -232,14 +269,17 @@ export default function FishingCompetition() {
       const { error } = await supabase.from('competitions').update({ title: newTitle }).eq('id', competitionId);
       if (error) throw error;
       setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, title: newTitle } : c));
+      setMainPageInfo(prev => ({ ...prev, title: newTitle }));
     } catch (err) { console.error('Cím mentési hiba:', err); }
   };
 
+  // FIX: saveCompetitionDetails egyszerre frissíti a mainPageInfo-t is
   const saveCompetitionDetails = async (field, value) => {
     if (!competitionId) return;
     try {
       const { error } = await supabase.from('competitions').update({ [field]: value }).eq('id', competitionId);
       if (error) throw error;
+      setMainPageInfo(prev => ({ ...prev, [field]: value }));
     } catch (err) { console.error('Részlet mentési hiba:', err); }
   };
 
@@ -255,7 +295,6 @@ export default function FishingCompetition() {
     } catch (err) { alert('Hiba: ' + err.message); }
   };
 
-  // FIX: Versenyző törlés - MINDIG a modal megerősítésen át megy
   const confirmDeleteCompetitor = (id, name) => {
     setDeleteConfirm({ id, name });
   };
@@ -313,7 +352,6 @@ export default function FishingCompetition() {
     } else alert('Másold ki a böngésző címsorából az URL-t!');
   };
 
-  // FIX: TOP 3 - minden egyes mérés nagyhal értéke ÖNÁLLÓAN versenyez
   const results = useMemo(() => {
     const allEntries = [];
     competitors.forEach(c => {
@@ -362,7 +400,6 @@ export default function FishingCompetition() {
               </button>
             )}
           </div>
-          {/* Archív verseny információk */}
           {(archivedCompetition.description || archivedCompetition.location || archivedCompetition.notes) && (
             <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg p-5 mb-4 border-2 border-gray-300">
               <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
@@ -388,7 +425,6 @@ export default function FishingCompetition() {
               )}
             </div>
           )}
-          {/* Archív versenyzők */}
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
             <div className="overflow-x-auto">
@@ -455,7 +491,6 @@ export default function FishingCompetition() {
               </table>
             </div>
           </div>
-          {/* Archív eredmények */}
           <div className="grid md:grid-cols-2 gap-4 mb-4">
             <div className="bg-white rounded-lg shadow-lg p-4">
               <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal</h3>
@@ -490,30 +525,28 @@ export default function FishingCompetition() {
                 <Plus className="w-5 h-5" />Új Verseny Indítása
               </button>
             )}
-            {/* Aktív versenyek */}
             <h3 className="text-base font-bold text-green-700 mb-2 flex items-center gap-2"><Fish className="w-4 h-4" />Aktuális Versenyek</h3>
             <div className="space-y-3 mb-6">
               {activeCompetitions.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Nincs aktív verseny</p>}
               {activeCompetitions.map(comp => {
                 const d = new Date(comp.created_at);
                 const ds = d.getFullYear()+'.'+String(d.getMonth()+1).padStart(2,'0')+'.'+String(d.getDate()).padStart(2,'0');
-                const isActive = comp.id === competitionId;
+                const isActive = comp.id === competitionId && activeCompetitionLoaded;
                 return (
                   <div key={comp.id} className={isActive ? 'border-2 rounded-lg p-4 flex justify-between items-center border-green-500 bg-green-50' : 'border-2 rounded-lg p-4 flex justify-between items-center border-gray-200'}>
                     <div className="flex-1">
                       <h3 className="text-lg font-bold text-gray-800">{comp.title}</h3>
                       <p className="text-gray-500 text-sm">{ds}</p>
-                      {isActive && <span className="inline-block mt-1 bg-green-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Aktuális</span>}
+                      {isActive && <span className="inline-block mt-1 bg-green-600 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Betöltve</span>}
                     </div>
                     <div className="flex gap-2">
-                      {!isActive && <button onClick={() => loadCompetition(comp.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">Megnyitás</button>}
+                      <button onClick={() => loadCompetition(comp.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">Megnyitás</button>
                       {user && <button onClick={() => deleteCompetition(comp.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">Törlés</button>}
                     </div>
                   </div>
                 );
               })}
             </div>
-            {/* Korábbi versenyek */}
             <h3 className="text-base font-bold text-gray-600 mb-2 flex items-center gap-2"><Archive className="w-4 h-4" />Korábbi Versenyek</h3>
             <div className="space-y-3">
               {archivedList.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Még nincsenek lezárt versenyek</p>}
@@ -552,14 +585,12 @@ export default function FishingCompetition() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
       <div className="max-w-7xl mx-auto">
 
-        {/* Share toast */}
         {showShareToast && (
           <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2">
             <CheckCircle className="w-5 h-5" />Link másolva a vágólapra!
           </div>
         )}
 
-        {/* FIX: Versenyző törlés megerősítő modal */}
         {deleteConfirm && (
           <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
@@ -586,7 +617,7 @@ export default function FishingCompetition() {
             <Fish className="w-8 h-8" />
             {user
               ? <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveTitle(e.target.value); }} className="text-3xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white flex-1" placeholder="Verseny címe..." />
-              : <h1 className="text-3xl font-bold">{title}</h1>}
+              : <h1 className="text-3xl font-bold">{mainPageInfo.title || title}</h1>}
           </div>
           <p className="mt-1 text-green-100 text-sm">
             45 versenyző • Korlátlan mérés • Nagyhal + Apróhal + Darabszám
@@ -602,9 +633,11 @@ export default function FishingCompetition() {
           <button onClick={handleShare} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md">
             <Share2 className="w-4 h-4" />Megosztás
           </button>
-          <button onClick={() => loadCompetition(competitionId)} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md">
-            <RefreshCw className="w-4 h-4" />Frissítés
-          </button>
+          {activeCompetitionLoaded && (
+            <button onClick={() => loadCompetition(competitionId)} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md">
+              <RefreshCw className="w-4 h-4" />Frissítés
+            </button>
+          )}
           {user && (
             <button onClick={archiveCompetition} className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold flex items-center gap-2 shadow-md">
               <Archive className="w-4 h-4" />Verseny Lezárása
@@ -654,8 +687,8 @@ export default function FishingCompetition() {
               <div className="space-y-3">
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Verseny leírása / kiírás</label>
-                  <textarea 
-                    value={description} 
+                  <textarea
+                    value={description}
                     onChange={(e) => { setDescription(e.target.value); saveCompetitionDetails('description', e.target.value); }}
                     placeholder="Pl.: Egynapos horgászverseny, regisztráció 6:00-tól, verseny időtartama: 8:00-16:00"
                     className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
@@ -664,9 +697,9 @@ export default function FishingCompetition() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Helyszín</label>
-                  <input 
-                    type="text" 
-                    value={location} 
+                  <input
+                    type="text"
+                    value={location}
                     onChange={(e) => { setLocation(e.target.value); saveCompetitionDetails('location', e.target.value); }}
                     placeholder="Pl.: Tisza-tó, Abádszalók, 3. meder"
                     className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
@@ -674,8 +707,8 @@ export default function FishingCompetition() {
                 </div>
                 <div>
                   <label className="block text-sm font-semibold text-gray-700 mb-1">Egyéb közlendők / szabályok</label>
-                  <textarea 
-                    value={notes} 
+                  <textarea
+                    value={notes}
                     onChange={(e) => { setNotes(e.target.value); saveCompetitionDetails('notes', e.target.value); }}
                     placeholder="Pl.: Tiltott csalik, minimális méret szabályok, értékelési rendszer, díjazás"
                     className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
@@ -688,35 +721,35 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* Verseny információk megjelenítése - MINDEN látogatónak */}
-        {(description || location || notes) && (
+        {/* Verseny információk megjelenítése - MINDEN látogatónak (mainPageInfo alapján) */}
+        {(mainPageInfo.description || mainPageInfo.location || mainPageInfo.notes) && (
           <div className="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg shadow-lg p-5 mb-4 border-2 border-blue-200">
             <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
               <span className="text-2xl">ℹ️</span> Verseny Információk
             </h2>
-            {description && (
+            {mainPageInfo.description && (
               <div className="mb-3">
                 <h3 className="text-sm font-bold text-blue-700 mb-1 uppercase">Verseny kiírás</h3>
-                <p className="text-gray-700 whitespace-pre-wrap text-sm">{description}</p>
+                <p className="text-gray-700 whitespace-pre-wrap text-sm">{mainPageInfo.description}</p>
               </div>
             )}
-            {location && (
+            {mainPageInfo.location && (
               <div className="mb-3">
                 <h3 className="text-sm font-bold text-green-700 mb-1 uppercase">📍 Helyszín</h3>
-                <p className="text-gray-700 text-sm">{location}</p>
+                <p className="text-gray-700 text-sm">{mainPageInfo.location}</p>
               </div>
             )}
-            {notes && (
+            {mainPageInfo.notes && (
               <div>
                 <h3 className="text-sm font-bold text-orange-700 mb-1 uppercase">⚠️ Fontos információk</h3>
-                <p className="text-gray-700 whitespace-pre-wrap text-sm">{notes}</p>
+                <p className="text-gray-700 whitespace-pre-wrap text-sm">{mainPageInfo.notes}</p>
               </div>
             )}
           </div>
         )}
 
-        {/* Versenyző hozzáadás */}
-        {user && (
+        {/* Versenyző hozzáadás - csak ha verseny be van töltve */}
+        {user && activeCompetitionLoaded && (
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyző Hozzáadása</h2>
             <div className="flex gap-3">
@@ -728,8 +761,30 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* ADMIN NÉZET */}
-        {user && (
+        {/* Betöltési felhívás - ha nincs verseny betöltve */}
+        {!activeCompetitionLoaded && !user && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-4 text-center">
+            <Fish className="w-16 h-16 mx-auto mb-4 text-blue-300 opacity-60" />
+            <p className="text-gray-500 text-base mb-2 font-semibold">Az aktuális verseny adatainak megtekintéséhez</p>
+            <p className="text-gray-400 text-sm mb-4">nyisd meg a <strong>Versenyek</strong> menüt és válaszd ki a kívánt versenyt.</p>
+            <button onClick={() => setShowCompetitionList(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2 mx-auto">
+              <FolderOpen className="w-4 h-4" />Versenyek megnyitása
+            </button>
+          </div>
+        )}
+
+        {!activeCompetitionLoaded && user && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-4 text-center">
+            <Fish className="w-16 h-16 mx-auto mb-4 text-blue-300 opacity-60" />
+            <p className="text-gray-500 text-base mb-4">Nyiss meg egy versenyt az adatok szerkesztéséhez.</p>
+            <button onClick={() => setShowCompetitionList(true)} className="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2 mx-auto">
+              <FolderOpen className="w-4 h-4" />Versenyek megnyitása
+            </button>
+          </div>
+        )}
+
+        {/* ADMIN NÉZET - csak ha verseny be van töltve */}
+        {user && activeCompetitionLoaded && (
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
             <div className="overflow-x-auto">
@@ -784,7 +839,6 @@ export default function FishingCompetition() {
                                 </div>
                               : <button onClick={() => setEditingId(c.id)} className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs font-semibold">Rögzít</button>}
                           </td>
-                          {/* FIX: törlés gomb -> confirmDeleteCompetitor */}
                           <td className="px-2 py-2 text-center">
                             <button onClick={() => confirmDeleteCompetitor(c.id, c.name)} className="text-red-600 hover:text-red-800">
                               <Trash2 className="w-4 h-4" />
@@ -849,8 +903,8 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* FELHASZNÁLÓI NÉZET */}
-        {!user && (
+        {/* FELHASZNÁLÓI NÉZET - csak ha verseny be van töltve */}
+        {!user && activeCompetitionLoaded && (
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
             <div className="overflow-x-auto">
@@ -924,53 +978,55 @@ export default function FishingCompetition() {
           </div>
         )}
 
-        {/* EREDMÉNYEK */}
-        <div className="grid md:grid-cols-2 gap-4 mb-4">
-          <div className="bg-white rounded-lg shadow-lg p-4">
-            <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal</h3>
-            {results.top3Nagyhal.length > 0
-              ? <div className="space-y-2">{results.top3Nagyhal.map((e, i) => (
-                  <div key={i} className={placeStyle(i)}>
-                    <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-600">{i+1}.</span><span className="font-semibold">{e.name}</span></div>
-                    <span className="font-bold text-green-700 text-lg">{e.weight} g</span>
-                  </div>))}</div>
-              : <p className="text-gray-400 text-center py-6 text-sm">Még nincs rögzített nagyhal</p>}
-          </div>
-          <div className="bg-white rounded-lg shadow-lg p-4">
-            <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-blue-500" />Mind Összesen Eredmények</h3>
-            {results.top6Mindosszesen.length > 0 ? (
-              <div>
-                <div className="space-y-2">
-                  {results.top6Mindosszesen.slice(0, 6).map((c, i) => (
-                    <div key={c.id} className={i < 3 ? placeStyle(i) : 'flex justify-between items-center p-2 rounded bg-gray-50'}>
-                      <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-600">{i+1}.</span><span className="font-semibold">{c.name}</span></div>
-                      <span className="font-bold text-blue-700 text-lg">{c.mindosszesen} g</span>
-                    </div>
-                  ))}
-                </div>
-                {results.top6Mindosszesen.length > 6 && (
-                  <div className="mt-3">
-                    <button onClick={() => setShowAllResults(!showAllResults)} className="w-full py-2 text-sm text-blue-600 font-semibold hover:bg-blue-50 rounded border border-blue-200">
-                      {showAllResults ? '▲ Kevesebbet mutass' : '▼ Több eredmény (' + (results.top6Mindosszesen.length - 6) + ' több)'}
-                    </button>
-                    {showAllResults && (
-                      <div className="space-y-1 mt-2 border-t border-gray-200 pt-2">
-                        {results.top6Mindosszesen.slice(6).map((c, i) => (
-                          <div key={c.id} className="flex justify-between items-center p-2 rounded bg-gray-50 hover:bg-gray-100">
-                            <div className="flex items-center gap-2"><span className="text-sm font-bold text-gray-500">{i+7}.</span><span className="text-sm font-semibold text-gray-700">{c.name}</span></div>
-                            <span className="font-bold text-blue-600 text-sm">{c.mindosszesen} g</span>
-                          </div>
-                        ))}
+        {/* EREDMÉNYEK - csak ha verseny be van töltve */}
+        {activeCompetitionLoaded && (
+          <div className="grid md:grid-cols-2 gap-4 mb-4">
+            <div className="bg-white rounded-lg shadow-lg p-4">
+              <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal</h3>
+              {results.top3Nagyhal.length > 0
+                ? <div className="space-y-2">{results.top3Nagyhal.map((e, i) => (
+                    <div key={i} className={placeStyle(i)}>
+                      <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-600">{i+1}.</span><span className="font-semibold">{e.name}</span></div>
+                      <span className="font-bold text-green-700 text-lg">{e.weight} g</span>
+                    </div>))}</div>
+                : <p className="text-gray-400 text-center py-6 text-sm">Még nincs rögzített nagyhal</p>}
+            </div>
+            <div className="bg-white rounded-lg shadow-lg p-4">
+              <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-blue-500" />Mind Összesen Eredmények</h3>
+              {results.top6Mindosszesen.length > 0 ? (
+                <div>
+                  <div className="space-y-2">
+                    {results.top6Mindosszesen.slice(0, 6).map((c, i) => (
+                      <div key={c.id} className={i < 3 ? placeStyle(i) : 'flex justify-between items-center p-2 rounded bg-gray-50'}>
+                        <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-600">{i+1}.</span><span className="font-semibold">{c.name}</span></div>
+                        <span className="font-bold text-blue-700 text-lg">{c.mindosszesen} g</span>
                       </div>
-                    )}
+                    ))}
                   </div>
-                )}
-              </div>
-            ) : <p className="text-gray-400 text-center py-6 text-sm">Még nincs rögzített mérés</p>}
+                  {results.top6Mindosszesen.length > 6 && (
+                    <div className="mt-3">
+                      <button onClick={() => setShowAllResults(!showAllResults)} className="w-full py-2 text-sm text-blue-600 font-semibold hover:bg-blue-50 rounded border border-blue-200">
+                        {showAllResults ? '▲ Kevesebbet mutass' : '▼ Több eredmény (' + (results.top6Mindosszesen.length - 6) + ' több)'}
+                      </button>
+                      {showAllResults && (
+                        <div className="space-y-1 mt-2 border-t border-gray-200 pt-2">
+                          {results.top6Mindosszesen.slice(6).map((c, i) => (
+                            <div key={c.id} className="flex justify-between items-center p-2 rounded bg-gray-50 hover:bg-gray-100">
+                              <div className="flex items-center gap-2"><span className="text-sm font-bold text-gray-500">{i+7}.</span><span className="text-sm font-semibold text-gray-700">{c.name}</span></div>
+                              <span className="font-bold text-blue-600 text-sm">{c.mindosszesen} g</span>
+                            </div>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ) : <p className="text-gray-400 text-center py-6 text-sm">Még nincs rögzített mérés</p>}
+            </div>
           </div>
-        </div>
+        )}
 
-        {/* LÁTOGATÓSZÁMLÁLÓ - csak adminnak - OLDAL ALJÁN */}
+        {/* LÁTOGATÓSZÁMLÁLÓ - csak adminnak */}
         {user && (
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800 flex items-center gap-2">
@@ -979,7 +1035,6 @@ export default function FishingCompetition() {
                 <RefreshCw className="w-3 h-3" />Frissítés
               </button>
             </h2>
-            {/* Időszak statisztikák */}
             <div className="grid grid-cols-3 gap-3 mb-3">
               <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 text-center">
                 <p className="text-2xl font-bold text-blue-700">{pageViews.today}</p>
@@ -994,23 +1049,18 @@ export default function FishingCompetition() {
                 <p className="text-xs text-purple-500 font-semibold mt-1">Összes látogatás</p>
               </div>
             </div>
-            {/* Eszköz bontás */}
             <div className="border-t border-gray-100 pt-3">
               <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Eszköz szerinti bontás (összes)</p>
               <div className="grid grid-cols-2 gap-3">
                 <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-orange-600">📱 {pageViews.mobil}</p>
                   <p className="text-xs text-orange-500 font-semibold mt-1">Mobil látogatás</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {pageViews.total > 0 ? Math.round((pageViews.mobil / pageViews.total) * 100) : 0}%
-                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{pageViews.total > 0 ? Math.round((pageViews.mobil / pageViews.total) * 100) : 0}%</p>
                 </div>
                 <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center">
                   <p className="text-2xl font-bold text-gray-600">💻 {pageViews.pc}</p>
                   <p className="text-xs text-gray-500 font-semibold mt-1">PC látogatás</p>
-                  <p className="text-xs text-gray-400 mt-0.5">
-                    {pageViews.total > 0 ? Math.round((pageViews.pc / pageViews.total) * 100) : 0}%
-                  </p>
+                  <p className="text-xs text-gray-400 mt-0.5">{pageViews.total > 0 ? Math.round((pageViews.pc / pageViews.total) * 100) : 0}%</p>
                 </div>
               </div>
             </div>
