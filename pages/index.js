@@ -1,12 +1,11 @@
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, Lock, Archive, Share2, CheckCircle, Home, AlertTriangle } from 'lucide-react';
+import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, Lock, Archive, Share2, CheckCircle, Home, AlertTriangle, Save } from 'lucide-react';
 
 const supabaseUrl = 'https://scijtstwpbgxtsdqzowc.supabase.co';
 const supabaseKey = 'sb_publishable_jVuKo_UCsRvxdGbmYvGo-Q_cib0YWVv';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
-// ── Segédfüggvény: null / 'nullable' string → üres string ─────────────
 const safeField = (val) => {
   if (val === null || val === undefined) return '';
   const s = String(val).trim();
@@ -28,7 +27,7 @@ const placeStyle = (i) =>
   : i === 1 ? 'flex justify-between items-center p-3 rounded bg-gray-100 border-2 border-gray-400'
   : 'flex justify-between items-center p-3 rounded bg-orange-100 border-2 border-orange-400';
 
-// ── KÜLSŐ komponensek (nem kapnak fókuszproblémát) ────────────────────
+// ── Külső komponensek ─────────────────────────────────────────────────
 
 const DbErrorBanner = ({ dbError, setDbError }) => {
   if (!dbError) return null;
@@ -116,9 +115,7 @@ const VisitorStats = ({ pageViews, loadPageViews }) => (
 const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
   <div className="grid md:grid-cols-2 gap-4 mb-4">
     <div className="bg-white rounded-lg shadow-lg p-4">
-      <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2">
-        <Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal
-      </h3>
+      <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal</h3>
       {res.top3Nagyhal.length > 0
         ? <div className="space-y-2">{res.top3Nagyhal.map((e, i) => (
             <div key={i} className={placeStyle(i)}>
@@ -128,9 +125,7 @@ const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
         : <p className="text-gray-400 text-center py-6 text-sm">Nincs adat</p>}
     </div>
     <div className="bg-white rounded-lg shadow-lg p-4">
-      <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2">
-        <Trophy className="w-5 h-5 text-blue-500" />Mind Összesen Eredmények
-      </h3>
+      <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-blue-500" />Mind Összesen Eredmények</h3>
       {res.top6Mindosszesen.length > 0 ? (
         <div>
           <div className="space-y-2">
@@ -171,7 +166,7 @@ export default function FishingCompetition() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [loginError, setLoginError] = useState('');
-  const [view, setView] = useState('home'); // 'home' | 'competition' | 'archived' | 'list'
+  const [view, setView] = useState('home');
   const [dbError, setDbError] = useState(null);
 
   const [competitions, setCompetitions] = useState([]);
@@ -202,14 +197,23 @@ export default function FishingCompetition() {
   const [showLoginModal, setShowLoginModal] = useState(false);
   const [mainPageInfo, setMainPageInfo] = useState({ description: '', location: '', notes: '', title: '' });
 
+  // Mentés állapot visszajelzéshez
+  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+
+  // Debounce timerek
   const saveTimers = useRef({});
+  // Az aktuális competitionId ref-ben is tárolva, hogy a mentőfüggvény mindig friss értéket látsson
+  const competitionIdRef = useRef(null);
+
+  useEffect(() => {
+    competitionIdRef.current = competitionId;
+  }, [competitionId]);
 
   useEffect(() => {
     trackVisit();
     checkUser();
     const { data: authListener } = supabase.auth.onAuthStateChange((event, session) => {
       setUser(session?.user ?? null);
-      if (session?.user) loadCompetitions();
     });
     return () => { authListener?.subscription?.unsubscribe(); };
   }, []);
@@ -263,6 +267,7 @@ export default function FishingCompetition() {
         setMainPageInfo({ description: desc, location: loc, notes: nts, title: ttl });
         setTitle(ttl);
         setCompetitionId(active.id);
+        competitionIdRef.current = active.id;
         setDescription(desc);
         setLocation(loc);
         setNotes(nts);
@@ -318,7 +323,9 @@ export default function FishingCompetition() {
       const desc = safeField(comp.description);
       const loc  = safeField(comp.location);
       const nts  = safeField(comp.notes);
-      setCompetitionId(comp.id); setTitle(ttl); setDescription(desc); setLocation(loc); setNotes(nts);
+      setCompetitionId(comp.id);
+      competitionIdRef.current = comp.id;
+      setTitle(ttl); setDescription(desc); setLocation(loc); setNotes(nts);
       setMainPageInfo({ description: desc, location: loc, notes: nts, title: ttl });
       const built = await buildCompetitors(comp.id);
       setCompetitors(built);
@@ -370,7 +377,9 @@ export default function FishingCompetition() {
       const { data, error } = await supabase.from('competitions').insert([{ title: 'Horgászverseny - ' + dateStr, archived: false }]).select('*');
       if (error) throw error;
       const comp = data[0];
-      setCompetitionId(comp.id); setTitle(safeField(comp.title));
+      setCompetitionId(comp.id);
+      competitionIdRef.current = comp.id;
+      setTitle(safeField(comp.title));
       setDescription(''); setLocation(''); setNotes('');
       setMainPageInfo({ description: '', location: '', notes: '', title: safeField(comp.title) });
       setCompetitors([]);
@@ -390,28 +399,58 @@ export default function FishingCompetition() {
   };
 
   const saveTitle = async (newTitle) => {
-    if (!competitionId) return;
+    if (!competitionIdRef.current) return;
     try {
-      const { error } = await supabase.from('competitions').update({ title: newTitle }).eq('id', competitionId);
+      const { error } = await supabase.from('competitions').update({ title: newTitle }).eq('id', competitionIdRef.current);
       if (error) throw error;
-      setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, title: newTitle } : c));
+      setCompetitions(prev => prev.map(c => c.id === competitionIdRef.current ? { ...c, title: newTitle } : c));
       setMainPageInfo(prev => ({ ...prev, title: newTitle }));
     } catch (err) { console.error('Cím mentési hiba:', err); }
   };
 
-  // Azonnali UI-frissítés + 800ms debounce utáni DB-mentés
+  // Tényleges DB mentés – ref-et használ, nem state-et, hogy mindig friss ID-t kapjon
+  const saveFieldToDb = useCallback(async (field, value) => {
+    const cid = competitionIdRef.current;
+    if (!cid) {
+      setDbError('Mentési hiba: nincs aktív verseny kiválasztva. Frissítsd az oldalt!');
+      setSaveStatus('error');
+      return;
+    }
+    setSaveStatus('saving');
+    try {
+      const { error } = await supabase.from('competitions').update({ [field]: value }).eq('id', cid);
+      if (error) {
+        setDbError('Mentési hiba (' + field + '): ' + error.message);
+        setSaveStatus('error');
+      } else {
+        setDbError(null);
+        setSaveStatus('saved');
+        setTimeout(() => setSaveStatus('idle'), 2000);
+      }
+    } catch (err) {
+      setDbError('Mentési hiba: ' + err.message);
+      setSaveStatus('error');
+    }
+  }, []);
+
+  // onChange: azonnal frissíti a UI-t + debounce-olt mentés
   const handleInfoChange = (field, value, setter) => {
     setter(value);
     setMainPageInfo(prev => ({ ...prev, [field]: value }));
+    setSaveStatus('saving');
     if (saveTimers.current[field]) clearTimeout(saveTimers.current[field]);
-    saveTimers.current[field] = setTimeout(async () => {
-      if (!competitionId) return;
-      try {
-        const { error } = await supabase.from('competitions').update({ [field]: value }).eq('id', competitionId);
-        if (error) setDbError('Mentési hiba (' + field + '): ' + error.message);
-        else setDbError(null);
-      } catch (err) { console.error('Részlet mentési hiba:', err); }
-    }, 800);
+    saveTimers.current[field] = setTimeout(() => {
+      saveFieldToDb(field, value);
+    }, 500);
+  };
+
+  // onBlur: azonnal ment, törli a debounce timert (nehogy duplán menjen)
+  const handleInfoBlur = (field, value) => {
+    if (saveTimers.current[field]) {
+      clearTimeout(saveTimers.current[field]);
+      saveTimers.current[field] = null;
+    }
+    saveFieldToDb(field, value);
   };
 
   const addCompetitor = async () => {
@@ -499,10 +538,97 @@ export default function FishingCompetition() {
   const activeCompetitions = competitions.filter(c => !c.archived);
   const archivedList = competitions.filter(c => c.archived);
 
-  // Közös gombok (belépés/kilépés)
+  // Mentés státusz jelző
+  const SaveIndicator = () => {
+    if (saveStatus === 'idle') return null;
+    if (saveStatus === 'saving') return (
+      <span className="text-xs text-blue-500 flex items-center gap-1 animate-pulse">
+        <Save className="w-3 h-3" />Mentés...
+      </span>
+    );
+    if (saveStatus === 'saved') return (
+      <span className="text-xs text-green-600 flex items-center gap-1">
+        <CheckCircle className="w-3 h-3" />Mentve ✓
+      </span>
+    );
+    if (saveStatus === 'error') return (
+      <span className="text-xs text-red-500 flex items-center gap-1">
+        <AlertTriangle className="w-3 h-3" />Mentési hiba!
+      </span>
+    );
+    return null;
+  };
+
+  // Admin info szerkesztő – ugyanaz a JSX inline kerül be mindkét nézetbe
+  const renderAdminInfoEditor = () => (
+    <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+      <div className="flex items-center justify-between mb-3">
+        <div className="flex items-center gap-3">
+          <h2 className="text-lg font-bold text-gray-800">📋 Verseny Információk</h2>
+          <SaveIndicator />
+        </div>
+        <button onClick={() => setShowCompetitionInfo(!showCompetitionInfo)}
+          className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-semibold">
+          {showCompetitionInfo ? '▲ Bezár' : '▼ Szerkeszt'}
+        </button>
+      </div>
+      {showCompetitionInfo && (
+        <div className="space-y-3">
+          {!competitionIdRef.current && (
+            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 text-sm text-yellow-800">
+              ⚠️ Nincs aktív verseny. Hozz létre egyet a Versenyek menüben, majd a szerkesztő automatikusan aktiválódik.
+            </div>
+          )}
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Verseny leírása / kiírás</label>
+            <textarea value={description}
+              onChange={(e) => handleInfoChange('description', e.target.value, setDescription)}
+              onBlur={(e) => handleInfoBlur('description', e.target.value)}
+              placeholder="Pl.: Egynapos horgászverseny, regisztráció 6:00-tól, verseny időtartama: 8:00-16:00"
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Helyszín</label>
+            <input type="text" value={location}
+              onChange={(e) => handleInfoChange('location', e.target.value, setLocation)}
+              onBlur={(e) => handleInfoBlur('location', e.target.value)}
+              placeholder="Pl.: Tisza-tó, Abádszalók, 3. meder"
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" />
+          </div>
+          <div>
+            <label className="block text-sm font-semibold text-gray-700 mb-1">Egyéb közlendők / szabályok</label>
+            <textarea value={notes}
+              onChange={(e) => handleInfoChange('notes', e.target.value, setNotes)}
+              onBlur={(e) => handleInfoBlur('notes', e.target.value)}
+              placeholder="Pl.: Tiltott csalik, minimális méret szabályok, értékelési rendszer, díjazás"
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
+          </div>
+          <p className="text-xs text-gray-400 italic">
+            💡 Az adatok a mező elhagyásakor (<strong>kattintás máshová</strong>) azonnal mentődnek az adatbázisba.
+          </p>
+        </div>
+      )}
+    </div>
+  );
+
   const AuthButton = () => user
     ? <button onClick={handleLogout} className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 text-sm font-semibold flex items-center gap-2 shadow-md"><LogOut className="w-4 h-4" />Kilépés</button>
     : <button onClick={() => setShowLoginModal(true)} className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold flex items-center gap-2 shadow-md"><Lock className="w-4 h-4" />Admin</button>;
+
+  const DeleteModal = () => deleteConfirm ? (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
+        <div className="flex items-center gap-3 mb-4"><div className="bg-red-100 p-2 rounded-full"><Trash2 className="w-6 h-6 text-red-600" /></div><h2 className="text-lg font-bold">Versenyző törlése</h2></div>
+        <p className="text-gray-600 mb-2">Biztosan törlöd ezt a versenyzőt?</p>
+        <p className="text-red-700 font-bold text-center bg-red-50 rounded-lg py-2 px-3 mb-3">„{deleteConfirm.name}"</p>
+        <p className="text-gray-500 text-xs mb-5 text-center">Az összes mérési adatával együtt törlődik!<br/>Ez a művelet <strong>nem visszavonható</strong>.</p>
+        <div className="flex gap-3">
+          <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">Mégse</button>
+          <button onClick={executeDeleteCompetitor} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" />Törlés</button>
+        </div>
+      </div>
+    </div>
+  ) : null;
 
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
@@ -517,21 +643,7 @@ export default function FishingCompetition() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
         <div className="max-w-7xl mx-auto">
-          {/* Törlés megerősítés modal */}
-          {deleteConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-                <div className="flex items-center gap-3 mb-4"><div className="bg-red-100 p-2 rounded-full"><Trash2 className="w-6 h-6 text-red-600" /></div><h2 className="text-lg font-bold text-gray-800">Versenyző törlése</h2></div>
-                <p className="text-gray-600 mb-2">Biztosan törlöd ezt a versenyzőt?</p>
-                <p className="text-red-700 font-bold text-center bg-red-50 rounded-lg py-2 px-3 mb-3">„{deleteConfirm.name}"</p>
-                <p className="text-gray-500 text-xs mb-5 text-center">Az összes mérési adatával együtt törlődik!<br/>Ez a művelet <strong>nem visszavonható</strong>.</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">Mégse</button>
-                  <button onClick={executeDeleteCompetitor} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" />Törlés</button>
-                </div>
-              </div>
-            </div>
-          )}
+          <DeleteModal />
           {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
           <DbErrorBanner dbError={dbError} setDbError={setDbError} />
           <div className="bg-gradient-to-r from-gray-600 to-gray-800 text-white p-5 rounded-lg shadow-xl mb-4">
@@ -567,7 +679,6 @@ export default function FishingCompetition() {
                       </tr>
                       {archivedExpandedId === c.id && c.measurements.length > 0 && (
                         <tr><td colSpan={6} className="p-0"><div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
-                          <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Mérések</p>
                           <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
                             <th className="text-left py-1">#</th><th className="text-left py-1">Időpont</th>
                             <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
@@ -655,27 +766,10 @@ export default function FishingCompetition() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
         <div className="max-w-7xl mx-auto">
-
-          {/* Törlés modal */}
-          {deleteConfirm && (
-            <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
-              <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-                <div className="flex items-center gap-3 mb-4"><div className="bg-red-100 p-2 rounded-full"><Trash2 className="w-6 h-6 text-red-600" /></div><h2 className="text-lg font-bold text-gray-800">Versenyző törlése</h2></div>
-                <p className="text-gray-600 mb-2">Biztosan törlöd ezt a versenyzőt?</p>
-                <p className="text-red-700 font-bold text-center bg-red-50 rounded-lg py-2 px-3 mb-3">„{deleteConfirm.name}"</p>
-                <p className="text-gray-500 text-xs mb-5 text-center">Az összes mérési adatával együtt törlődik!<br/>Ez a művelet <strong>nem visszavonható</strong>.</p>
-                <div className="flex gap-3">
-                  <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">Mégse</button>
-                  <button onClick={executeDeleteCompetitor} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" />Törlés</button>
-                </div>
-              </div>
-            </div>
-          )}
+          <DeleteModal />
           {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
-
           <DbErrorBanner dbError={dbError} setDbError={setDbError} />
 
-          {/* Fejléc */}
           <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-5 rounded-lg shadow-xl mb-4">
             <div className="flex items-center gap-3">
               <Fish className="w-8 h-8" />
@@ -687,7 +781,6 @@ export default function FishingCompetition() {
             <p className="mt-1 text-green-100 text-sm">45 versenyző • Korlátlan mérés{user ? ' • Admin: ' + user.email : ''}</p>
           </div>
 
-          {/* Navigáció */}
           <div className="flex flex-wrap gap-2 mb-4">
             <button onClick={goHome} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><Home className="w-4 h-4" />Főoldal</button>
             <button onClick={() => setView('list')} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><FolderOpen className="w-4 h-4" />Versenyek</button>
@@ -697,47 +790,9 @@ export default function FishingCompetition() {
             <AuthButton />
           </div>
 
-          {/* Admin infó szerkesztő – JSX inline, nem belső komponens */}
-          {user && (
-            <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-              <div className="flex items-center justify-between mb-3">
-                <h2 className="text-lg font-bold text-gray-800">📋 Verseny Információk Szerkesztése</h2>
-                <button onClick={() => setShowCompetitionInfo(!showCompetitionInfo)} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-semibold">
-                  {showCompetitionInfo ? '▲ Bezár' : '▼ Szerkeszt'}
-                </button>
-              </div>
-              {showCompetitionInfo && (
-                <div className="space-y-3">
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Verseny leírása / kiírás</label>
-                    <textarea value={description}
-                      onChange={(e) => handleInfoChange('description', e.target.value, setDescription)}
-                      placeholder="Pl.: Egynapos horgászverseny, regisztráció 6:00-tól, verseny időtartama: 8:00-16:00"
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Helyszín</label>
-                    <input type="text" value={location}
-                      onChange={(e) => handleInfoChange('location', e.target.value, setLocation)}
-                      placeholder="Pl.: Tisza-tó, Abádszalók, 3. meder"
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-semibold text-gray-700 mb-1">Egyéb közlendők / szabályok</label>
-                    <textarea value={notes}
-                      onChange={(e) => handleInfoChange('notes', e.target.value, setNotes)}
-                      placeholder="Pl.: Tiltott csalik, minimális méret szabályok, értékelési rendszer, díjazás"
-                      className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
-                  </div>
-                  <p className="text-xs text-gray-500 italic">✅ Az adatok automatikusan mentődnek. Azonnal láthatóak minden látogatónak.</p>
-                </div>
-              )}
-            </div>
-          )}
-
+          {user && renderAdminInfoEditor()}
           <InfoBlock info={mainPageInfo} />
 
-          {/* Versenyző hozzáadás */}
           {user && (
             <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
               <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyző Hozzáadása</h2>
@@ -755,7 +810,6 @@ export default function FishingCompetition() {
             </div>
           )}
 
-          {/* Admin tábla */}
           {user && (
             <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
               <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
@@ -854,7 +908,6 @@ export default function FishingCompetition() {
             </div>
           )}
 
-          {/* Felhasználói tábla */}
           {!user && (
             <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
               <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
@@ -878,7 +931,6 @@ export default function FishingCompetition() {
                         </tr>
                         {editingId === c.id && c.measurements.length > 0 && (
                           <tr><td colSpan={6} className="p-0"><div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
-                            <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Mérések history</p>
                             <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
                               <th className="text-left py-1">#</th><th className="text-left py-1">Időpont</th>
                               <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
@@ -926,7 +978,6 @@ export default function FishingCompetition() {
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
       <div className="max-w-7xl mx-auto">
 
-        {/* Login modal – JSX inline */}
         {showLoginModal && !user && (
           <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
             <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
@@ -970,49 +1021,12 @@ export default function FishingCompetition() {
           <AuthButton />
         </div>
 
-        {/* Admin infó szerkesztő a főoldalon – JSX inline */}
-        {user && (
-          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-lg font-bold text-gray-800">📋 Verseny Információk Szerkesztése</h2>
-              <button onClick={() => setShowCompetitionInfo(!showCompetitionInfo)} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-semibold">
-                {showCompetitionInfo ? '▲ Bezár' : '▼ Szerkeszt'}
-              </button>
-            </div>
-            {showCompetitionInfo && (
-              <div className="space-y-3">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Verseny leírása / kiírás</label>
-                  <textarea value={description}
-                    onChange={(e) => handleInfoChange('description', e.target.value, setDescription)}
-                    placeholder="Pl.: Egynapos horgászverseny, regisztráció 6:00-tól, verseny időtartama: 8:00-16:00"
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Helyszín</label>
-                  <input type="text" value={location}
-                    onChange={(e) => handleInfoChange('location', e.target.value, setLocation)}
-                    placeholder="Pl.: Tisza-tó, Abádszalók, 3. meder"
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Egyéb közlendők / szabályok</label>
-                  <textarea value={notes}
-                    onChange={(e) => handleInfoChange('notes', e.target.value, setNotes)}
-                    placeholder="Pl.: Tiltott csalik, minimális méret szabályok, értékelési rendszer, díjazás"
-                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
-                </div>
-                <p className="text-xs text-gray-500 italic">✅ Az adatok automatikusan mentődnek. Azonnal láthatóak minden látogatónak.</p>
-              </div>
-            )}
-          </div>
-        )}
-
+        {user && renderAdminInfoEditor()}
         <InfoBlock info={mainPageInfo} />
 
         {!mainPageInfo.description && !mainPageInfo.location && !mainPageInfo.notes && (
           <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4 text-center text-sm text-blue-700">
-            {user ? '👆 Kattints a "Verseny Információk Szerkesztése" gombra a tájékoztató hozzáadásához.' : 'Hamarosan megjelennek a verseny információk.'}
+            {user ? '👆 Kattints a "Verseny Információk" gombra a tájékoztató hozzáadásához.' : 'Hamarosan megjelennek a verseny információk.'}
           </div>
         )}
 
