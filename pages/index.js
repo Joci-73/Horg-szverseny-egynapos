@@ -37,6 +37,11 @@ export default function FishingCompetition() {
   const [archivedExpandedId, setArchivedExpandedId] = useState(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [pageViews, setPageViews] = useState({ today: 0, week: 0, total: 0 });
+  // Verseny részletek
+  const [description, setDescription] = useState('');
+  const [location, setLocation] = useState('');
+  const [notes, setNotes] = useState('');
+  const [showCompetitionInfo, setShowCompetitionInfo] = useState(false);
 
   useEffect(() => {
     trackVisit();
@@ -143,6 +148,9 @@ export default function FishingCompetition() {
       if (ce) throw ce;
       setCompetitionId(comp.id);
       setTitle(comp.title);
+      setDescription(comp.description || '');
+      setLocation(comp.location || '');
+      setNotes(comp.notes || '');
       const built = await buildCompetitors(comp.id);
       setCompetitors(built);
       setShowCompetitionList(false);
@@ -190,10 +198,19 @@ export default function FishingCompetition() {
     try {
       const now = new Date();
       const dateStr = now.getFullYear() + '.' + String(now.getMonth()+1).padStart(2,'0') + '.' + String(now.getDate()).padStart(2,'0');
-      const { data, error } = await supabase.from('competitions').insert([{ title: 'Horgászverseny - ' + dateStr, archived: false }]).select();
+      const { data, error } = await supabase.from('competitions').insert([{ 
+        title: 'Horgászverseny - ' + dateStr, 
+        archived: false,
+        description: '',
+        location: '',
+        notes: ''
+      }]).select();
       if (error) throw error;
       setCompetitionId(data[0].id);
       setTitle(data[0].title);
+      setDescription('');
+      setLocation('');
+      setNotes('');
       setCompetitors([]);
       await loadCompetitions();
       setShowCompetitionList(false);
@@ -216,6 +233,14 @@ export default function FishingCompetition() {
       if (error) throw error;
       setCompetitions(prev => prev.map(c => c.id === competitionId ? { ...c, title: newTitle } : c));
     } catch (err) { console.error('Cím mentési hiba:', err); }
+  };
+
+  const saveCompetitionDetails = async (field, value) => {
+    if (!competitionId) return;
+    try {
+      const { error } = await supabase.from('competitions').update({ [field]: value }).eq('id', competitionId);
+      if (error) throw error;
+    } catch (err) { console.error('Részlet mentési hiba:', err); }
   };
 
   const addCompetitor = async () => {
@@ -337,6 +362,32 @@ export default function FishingCompetition() {
               </button>
             )}
           </div>
+          {/* Archív verseny információk */}
+          {(archivedCompetition.description || archivedCompetition.location || archivedCompetition.notes) && (
+            <div className="bg-gradient-to-br from-gray-50 to-gray-100 rounded-lg shadow-lg p-5 mb-4 border-2 border-gray-300">
+              <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+                <span className="text-2xl">ℹ️</span> Verseny Információk
+              </h2>
+              {archivedCompetition.description && (
+                <div className="mb-3">
+                  <h3 className="text-sm font-bold text-gray-700 mb-1 uppercase">Verseny kiírás</h3>
+                  <p className="text-gray-600 whitespace-pre-wrap text-sm">{archivedCompetition.description}</p>
+                </div>
+              )}
+              {archivedCompetition.location && (
+                <div className="mb-3">
+                  <h3 className="text-sm font-bold text-gray-700 mb-1 uppercase">📍 Helyszín</h3>
+                  <p className="text-gray-600 text-sm">{archivedCompetition.location}</p>
+                </div>
+              )}
+              {archivedCompetition.notes && (
+                <div>
+                  <h3 className="text-sm font-bold text-gray-700 mb-1 uppercase">⚠️ Fontos információk</h3>
+                  <p className="text-gray-600 whitespace-pre-wrap text-sm">{archivedCompetition.notes}</p>
+                </div>
+              )}
+            </div>
+          )}
           {/* Archív versenyzők */}
           <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
@@ -587,6 +638,80 @@ export default function FishingCompetition() {
                 </button>
               </div>
             </div>
+          </div>
+        )}
+
+        {/* Verseny információk - ADMIN szerkesztés */}
+        {user && (
+          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+            <div className="flex items-center justify-between mb-3">
+              <h2 className="text-lg font-bold text-gray-800">📋 Verseny Információk</h2>
+              <button onClick={() => setShowCompetitionInfo(!showCompetitionInfo)} className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-semibold">
+                {showCompetitionInfo ? '▲ Bezár' : '▼ Szerkeszt'}
+              </button>
+            </div>
+            {showCompetitionInfo && (
+              <div className="space-y-3">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Verseny leírása / kiírás</label>
+                  <textarea 
+                    value={description} 
+                    onChange={(e) => { setDescription(e.target.value); saveCompetitionDetails('description', e.target.value); }}
+                    placeholder="Pl.: Egynapos horgászverseny, regisztráció 6:00-tól, verseny időtartama: 8:00-16:00"
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                    rows="3"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Helyszín</label>
+                  <input 
+                    type="text" 
+                    value={location} 
+                    onChange={(e) => { setLocation(e.target.value); saveCompetitionDetails('location', e.target.value); }}
+                    placeholder="Pl.: Tisza-tó, Abádszalók, 3. meder"
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-700 mb-1">Egyéb közlendők / szabályok</label>
+                  <textarea 
+                    value={notes} 
+                    onChange={(e) => { setNotes(e.target.value); saveCompetitionDetails('notes', e.target.value); }}
+                    placeholder="Pl.: Tiltott csalik, minimális méret szabályok, értékelési rendszer, díjazás"
+                    className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                    rows="3"
+                  />
+                </div>
+                <p className="text-xs text-gray-500 italic">Ezek az információk megjelennek minden látogatónak a főoldalon.</p>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Verseny információk megjelenítése - MINDEN látogatónak */}
+        {(description || location || notes) && (
+          <div className="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg shadow-lg p-5 mb-4 border-2 border-blue-200">
+            <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
+              <span className="text-2xl">ℹ️</span> Verseny Információk
+            </h2>
+            {description && (
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-blue-700 mb-1 uppercase">Verseny kiírás</h3>
+                <p className="text-gray-700 whitespace-pre-wrap text-sm">{description}</p>
+              </div>
+            )}
+            {location && (
+              <div className="mb-3">
+                <h3 className="text-sm font-bold text-green-700 mb-1 uppercase">📍 Helyszín</h3>
+                <p className="text-gray-700 text-sm">{location}</p>
+              </div>
+            )}
+            {notes && (
+              <div>
+                <h3 className="text-sm font-bold text-orange-700 mb-1 uppercase">⚠️ Fontos információk</h3>
+                <p className="text-gray-700 whitespace-pre-wrap text-sm">{notes}</p>
+              </div>
+            )}
           </div>
         )}
 
