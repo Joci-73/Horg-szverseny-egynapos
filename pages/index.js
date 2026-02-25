@@ -1022,22 +1022,136 @@ export default function FishingCompetition() {
         </div>
 
         {user && renderAdminInfoEditor()}
-        <InfoBlock info={mainPageInfo} />
 
-        {!mainPageInfo.description && !mainPageInfo.location && !mainPageInfo.notes && (
-          <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4 mb-4 text-center text-sm text-blue-700">
-            {user ? '👆 Kattints a "Verseny Információk" gombra a tájékoztató hozzáadásához.' : 'Hamarosan megjelennek a verseny információk.'}
+        {/* Aktív versenyek kártyái */}
+        {activeCompetitions.length > 0 && (
+          <div className="mb-4 space-y-4">
+            {activeCompetitions.map(comp => {
+              const desc = safeField(comp.description);
+              const loc  = safeField(comp.location);
+              const nts  = safeField(comp.notes);
+              const hasInfo = desc || loc || nts;
+              return (
+                <div key={comp.id} className="bg-white rounded-xl shadow-lg border-2 border-green-300 overflow-hidden">
+                  {/* Fejléc */}
+                  <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-5 py-4 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <Fish className="w-6 h-6 text-white" />
+                      <div>
+                        <h2 className="text-lg font-bold text-white">{safeField(comp.title) || 'Horgászverseny'}</h2>
+                        <span className="inline-block bg-green-400 bg-opacity-50 text-white text-xs font-bold px-2 py-0.5 rounded-full mt-0.5">🟢 Aktív verseny</span>
+                      </div>
+                    </div>
+                    <button
+                      onClick={() => loadCompetition(comp.id)}
+                      className="px-4 py-2 bg-white text-green-700 rounded-lg font-bold text-sm hover:bg-green-50 shadow flex items-center gap-2 flex-shrink-0">
+                      <Trophy className="w-4 h-4" />Eredmények
+                    </button>
+                  </div>
+
+                  {/* Kiírás tartalma */}
+                  {hasInfo ? (
+                    <div className="p-5 space-y-4">
+                      {desc && (
+                        <div>
+                          <h3 className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📋 Verseny kiírás</h3>
+                          <p className="text-gray-700 text-sm whitespace-pre-wrap">{desc}</p>
+                        </div>
+                      )}
+                      {loc && (
+                        <div>
+                          <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">📍 Helyszín</h3>
+                          <p className="text-gray-700 text-sm">{loc}</p>
+                        </div>
+                      )}
+                      {nts && (
+                        <div>
+                          <h3 className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-1">⚠️ Fontos tudnivalók</h3>
+                          <p className="text-gray-700 text-sm whitespace-pre-wrap">{nts}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="px-5 py-4 text-sm text-gray-400 italic">
+                      {user ? '👆 Kattints a "Verseny Információk" gombra a kiírás hozzáadásához.' : 'A verseny kiírása hamarosan megjelenik.'}
+                    </div>
+                  )}
+                </div>
+              );
+            })}
           </div>
         )}
 
-        <div className="bg-white rounded-lg shadow-lg p-8 mb-4 text-center">
-          <Fish className="w-16 h-16 mx-auto mb-4 text-blue-300 opacity-60" />
-          <p className="text-gray-600 text-base mb-2 font-semibold">Az aktuális verseny eredményeinek megtekintéséhez</p>
-          <p className="text-gray-400 text-sm mb-5">nyisd meg a <strong>Versenyek</strong> menüt, és válaszd ki a kívánt versenyt.</p>
-          <button onClick={() => setView('list')} className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 font-semibold flex items-center gap-2 mx-auto shadow-md">
-            <FolderOpen className="w-5 h-5" />Versenyek megnyitása
-          </button>
-        </div>
+        {/* Archív versenyek kiírásai — csak ha van tartalmuk */}
+        {archivedList.filter(c => safeField(c.description) || safeField(c.location) || safeField(c.notes)).length > 0 && (
+          <div className="mb-4">
+            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+              <Archive className="w-4 h-4" />Korábbi versenyek kiírásai
+            </h3>
+            <div className="space-y-3">
+              {archivedList.filter(c => safeField(c.description) || safeField(c.location) || safeField(c.notes)).map(comp => {
+                const desc = safeField(comp.description);
+                const loc  = safeField(comp.location);
+                const nts  = safeField(comp.notes);
+                const isOpen = expandedAdminId === comp.id;
+                return (
+                  <div key={comp.id} className="bg-white rounded-xl shadow border-2 border-gray-200 overflow-hidden">
+                    <button
+                      onClick={() => setExpandedAdminId(isOpen ? null : comp.id)}
+                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
+                      <div className="flex items-center gap-3">
+                        <Archive className="w-5 h-5 text-gray-400" />
+                        <div className="text-left">
+                          <p className="font-bold text-gray-700">{safeField(comp.title) || 'Horgászverseny'}</p>
+                          <p className="text-xs text-gray-400">{formatDate(comp.created_at)} • Lezárt verseny</p>
+                        </div>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-gray-400 font-semibold">{isOpen ? 'Bezár ▲' : 'Kiírás megtekintése ▼'}</span>
+                      </div>
+                    </button>
+                    {isOpen && (
+                      <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-3">
+                        {desc && (
+                          <div>
+                            <h3 className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📋 Verseny kiírás</h3>
+                            <p className="text-gray-700 text-sm whitespace-pre-wrap">{desc}</p>
+                          </div>
+                        )}
+                        {loc && (
+                          <div>
+                            <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">📍 Helyszín</h3>
+                            <p className="text-gray-700 text-sm">{loc}</p>
+                          </div>
+                        )}
+                        {nts && (
+                          <div>
+                            <h3 className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-1">⚠️ Fontos tudnivalók</h3>
+                            <p className="text-gray-700 text-sm whitespace-pre-wrap">{nts}</p>
+                          </div>
+                        )}
+                        <button onClick={() => loadArchivedCompetition(comp.id)} className="mt-2 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 flex items-center gap-2">
+                          <Trophy className="w-4 h-4" />Eredmények megtekintése
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        {/* Ha nincs egy verseny sem */}
+        {competitions.length === 0 && (
+          <div className="bg-white rounded-lg shadow-lg p-8 mb-4 text-center">
+            <Fish className="w-16 h-16 mx-auto mb-4 text-blue-300 opacity-60" />
+            <p className="text-gray-500 text-sm">Még nincs verseny. {user ? 'Hozz létre egyet a Versenyek menüben!' : 'Hamarosan indul a következő verseny.'}</p>
+            {user && <button onClick={() => setView('list')} className="mt-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center gap-2 mx-auto">
+              <Plus className="w-5 h-5" />Verseny létrehozása
+            </button>}
+          </div>
+        )}
 
         {user && <VisitorStats pageViews={pageViews} loadPageViews={loadPageViews} />}
       </div>
