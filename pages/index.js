@@ -1,33 +1,52 @@
 import React, { useState, useEffect, useMemo, useRef, useCallback } from 'react';
 import { createClient } from '@supabase/supabase-js';
-import { Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, Lock, Archive, Share2, CheckCircle, Home, AlertTriangle, Save } from 'lucide-react';
+import {
+  Trash2, Plus, Trophy, Fish, RefreshCw, LogOut, FolderOpen, Lock,
+  Archive, Share2, CheckCircle, Home, AlertTriangle, Save, Users,
+  ChevronDown, ChevronUp, Camera, MapPin, ClipboardList, Calendar,
+  Edit2, X, ImageIcon
+} from 'lucide-react';
 
 const supabaseUrl = 'https://scijtstwpbgxtsdqzowc.supabase.co';
 const supabaseKey = 'sb_publishable_jVuKo_UCsRvxdGbmYvGo-Q_cib0YWVv';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ── Segédfüggvények ───────────────────────────────────────────────────
 const safeField = (val) => {
   if (val === null || val === undefined) return '';
   const s = String(val).trim();
   if (s === '' || s === 'nullable' || s === 'nullable::text') return '';
   return s;
 };
-
 const formatDate = (s) => {
+  if (!s) return '';
   const d = new Date(s);
-  return d.getFullYear() + '.' + String(d.getMonth() + 1).padStart(2, '0') + '.' + String(d.getDate()).padStart(2, '0');
+  return d.getFullYear() + '. ' +
+    ['január','február','március','április','május','június',
+     'július','augusztus','szeptember','október','november','december'][d.getMonth()] +
+    ' ' + d.getDate() + '.';
 };
 const formatDateTime = (s) => {
   const d = new Date(s);
-  return formatDate(s) + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+  return d.getFullYear() + '.' + String(d.getMonth()+1).padStart(2,'0') + '.' +
+    String(d.getDate()).padStart(2,'0') + ' ' +
+    String(d.getHours()).padStart(2,'0') + ':' + String(d.getMinutes()).padStart(2,'0');
 };
-
 const placeStyle = (i) =>
   i === 0 ? 'flex justify-between items-center p-3 rounded bg-yellow-100 border-2 border-yellow-400'
   : i === 1 ? 'flex justify-between items-center p-3 rounded bg-gray-100 border-2 border-gray-400'
   : 'flex justify-between items-center p-3 rounded bg-orange-100 border-2 border-orange-400';
 
-// ── Külső komponensek ─────────────────────────────────────────────────
+// Szektorokhoz szín
+const sectorColor = (title) => {
+  const t = (title || '').toUpperCase();
+  if (t.includes('" A"') || t.endsWith(' A') || t.includes('A SZEK') || t.includes('- A')) return { bg: 'from-blue-600 to-blue-700', badge: 'bg-blue-500', text: 'A', light: 'bg-blue-50 border-blue-300' };
+  if (t.includes('" B"') || t.endsWith(' B') || t.includes('B SZEK') || t.includes('- B')) return { bg: 'from-emerald-600 to-emerald-700', badge: 'bg-emerald-500', text: 'B', light: 'bg-emerald-50 border-emerald-300' };
+  if (t.includes('" C"') || t.endsWith(' C') || t.includes('C SZEK') || t.includes('- C')) return { bg: 'from-purple-600 to-purple-700', badge: 'bg-purple-500', text: 'C', light: 'bg-purple-50 border-purple-300' };
+  return { bg: 'from-green-600 to-blue-600', badge: 'bg-green-500', text: '🎣', light: 'bg-green-50 border-green-300' };
+};
+
+// ── KÜLSŐ komponensek ─────────────────────────────────────────────────
 
 const DbErrorBanner = ({ dbError, setDbError }) => {
   if (!dbError) return null;
@@ -43,70 +62,30 @@ const DbErrorBanner = ({ dbError, setDbError }) => {
   );
 };
 
-const InfoBlock = ({ info }) => {
-  if (!info || (!info.description && !info.location && !info.notes)) return null;
-  return (
-    <div className="bg-gradient-to-br from-blue-50 to-green-50 rounded-lg shadow-lg p-5 mb-4 border-2 border-blue-200">
-      <h2 className="text-xl font-bold text-gray-800 mb-3 flex items-center gap-2">
-        <span className="text-2xl">ℹ️</span> Verseny Információk
-      </h2>
-      {info.description && (
-        <div className="mb-3">
-          <h3 className="text-sm font-bold text-blue-700 mb-1 uppercase">Verseny kiírás</h3>
-          <p className="text-gray-700 whitespace-pre-wrap text-sm">{info.description}</p>
-        </div>
-      )}
-      {info.location && (
-        <div className="mb-3">
-          <h3 className="text-sm font-bold text-green-700 mb-1 uppercase">📍 Helyszín</h3>
-          <p className="text-gray-700 text-sm">{info.location}</p>
-        </div>
-      )}
-      {info.notes && (
-        <div>
-          <h3 className="text-sm font-bold text-orange-700 mb-1 uppercase">⚠️ Fontos információk</h3>
-          <p className="text-gray-700 whitespace-pre-wrap text-sm">{info.notes}</p>
-        </div>
-      )}
-    </div>
-  );
-};
-
 const VisitorStats = ({ pageViews, loadPageViews }) => (
   <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
     <h2 className="text-lg font-bold mb-3 text-gray-800 flex items-center gap-2">
-      👁️ Látogatók Statisztikája
+      👁️ Látogatók
       <button onClick={loadPageViews} className="ml-auto px-2 py-1 bg-gray-100 text-gray-600 rounded hover:bg-gray-200 text-xs flex items-center gap-1">
         <RefreshCw className="w-3 h-3" />Frissítés
       </button>
     </h2>
     <div className="grid grid-cols-3 gap-3 mb-3">
-      <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-3 text-center">
-        <p className="text-2xl font-bold text-blue-700">{pageViews.today}</p>
-        <p className="text-xs text-blue-500 font-semibold mt-1">Mai látogatás</p>
-      </div>
-      <div className="bg-green-50 border-2 border-green-200 rounded-lg p-3 text-center">
-        <p className="text-2xl font-bold text-green-700">{pageViews.week}</p>
-        <p className="text-xs text-green-500 font-semibold mt-1">Elmúlt 7 nap</p>
-      </div>
-      <div className="bg-purple-50 border-2 border-purple-200 rounded-lg p-3 text-center">
-        <p className="text-2xl font-bold text-purple-700">{pageViews.total}</p>
-        <p className="text-xs text-purple-500 font-semibold mt-1">Összes látogatás</p>
-      </div>
+      {[['Mai', pageViews.today, 'blue'], ['7 nap', pageViews.week, 'green'], ['Összes', pageViews.total, 'purple']].map(([lbl, val, c]) => (
+        <div key={lbl} className={`bg-${c}-50 border-2 border-${c}-200 rounded-lg p-3 text-center`}>
+          <p className={`text-2xl font-bold text-${c}-700`}>{val}</p>
+          <p className={`text-xs text-${c}-500 font-semibold mt-1`}>{lbl}</p>
+        </div>
+      ))}
     </div>
-    <div className="border-t border-gray-100 pt-3">
-      <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Eszköz szerinti bontás</p>
-      <div className="grid grid-cols-2 gap-3">
-        <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-orange-600">📱 {pageViews.mobil}</p>
-          <p className="text-xs text-orange-500 font-semibold mt-1">Mobil</p>
-          <p className="text-xs text-gray-400 mt-0.5">{pageViews.total > 0 ? Math.round((pageViews.mobil / pageViews.total) * 100) : 0}%</p>
-        </div>
-        <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center">
-          <p className="text-2xl font-bold text-gray-600">💻 {pageViews.pc}</p>
-          <p className="text-xs text-gray-500 font-semibold mt-1">PC</p>
-          <p className="text-xs text-gray-400 mt-0.5">{pageViews.total > 0 ? Math.round((pageViews.pc / pageViews.total) * 100) : 0}%</p>
-        </div>
+    <div className="grid grid-cols-2 gap-3">
+      <div className="bg-orange-50 border-2 border-orange-200 rounded-lg p-3 text-center">
+        <p className="text-xl font-bold text-orange-600">📱 {pageViews.mobil}</p>
+        <p className="text-xs text-orange-500 mt-1">Mobil — {pageViews.total > 0 ? Math.round(pageViews.mobil / pageViews.total * 100) : 0}%</p>
+      </div>
+      <div className="bg-gray-50 border-2 border-gray-200 rounded-lg p-3 text-center">
+        <p className="text-xl font-bold text-gray-600">💻 {pageViews.pc}</p>
+        <p className="text-xs text-gray-500 mt-1">PC — {pageViews.total > 0 ? Math.round(pageViews.pc / pageViews.total * 100) : 0}%</p>
       </div>
     </div>
   </div>
@@ -125,7 +104,7 @@ const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
         : <p className="text-gray-400 text-center py-6 text-sm">Nincs adat</p>}
     </div>
     <div className="bg-white rounded-lg shadow-lg p-4">
-      <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-blue-500" />Mind Összesen Eredmények</h3>
+      <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-blue-500" />Összesített Eredmények</h3>
       {res.top6Mindosszesen.length > 0 ? (
         <div>
           <div className="space-y-2">
@@ -139,7 +118,7 @@ const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
           {res.top6Mindosszesen.length > 6 && (
             <div className="mt-3">
               <button onClick={() => setShowAllResults(!showAllResults)} className="w-full py-2 text-sm text-blue-600 font-semibold hover:bg-blue-50 rounded border border-blue-200">
-                {showAllResults ? '▲ Kevesebbet mutass' : `▼ Több eredmény (${res.top6Mindosszesen.length - 6} több)`}
+                {showAllResults ? '▲ Kevesebbet' : `▼ Még ${res.top6Mindosszesen.length - 6} versenyző`}
               </button>
               {showAllResults && (
                 <div className="space-y-1 mt-2 border-t border-gray-200 pt-2">
@@ -158,6 +137,229 @@ const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
     </div>
   </div>
 );
+
+// ── Versenyesemény kártya a főoldalon ─────────────────────────────────
+// Egy "esemény" = egy csoport (pl. 2026.02.28) vagy önálló verseny
+// competitions: az ehhez tartozó versenyek tömbje
+const EventCard = ({ eventName, competitions, onOpenCompetition, onOpenArchived, isArchived, user, onRegister }) => {
+  const [openSectorId, setOpenSectorId] = useState(null);
+  const hasMultipleSectors = competitions.length > 1;
+
+  return (
+    <div className={`rounded-2xl shadow-lg overflow-hidden mb-5 border-2 ${isArchived ? 'border-gray-300' : 'border-green-300'}`}>
+      {/* Esemény fejléc */}
+      <div className={`px-5 py-4 ${isArchived ? 'bg-gradient-to-r from-gray-500 to-gray-600' : 'bg-gradient-to-r from-green-600 to-teal-600'} text-white`}>
+        <div className="flex items-start justify-between gap-3">
+          <div>
+            <div className="flex items-center gap-2 mb-1">
+              {isArchived
+                ? <Archive className="w-5 h-5 text-gray-300" />
+                : <span className="inline-block w-2.5 h-2.5 rounded-full bg-green-300 animate-pulse" />}
+              <span className="text-xs font-bold uppercase tracking-wider opacity-80">
+                {isArchived ? 'Korábbi verseny' : '🟢 Aktuális verseny'}
+              </span>
+            </div>
+            <h2 className="text-xl font-bold leading-tight">{eventName}</h2>
+            {hasMultipleSectors && (
+              <p className="text-xs mt-1 opacity-75">{competitions.length} szektor</p>
+            )}
+          </div>
+          {hasMultipleSectors && (
+            <div className="flex gap-1 flex-shrink-0">
+              {competitions.map(c => {
+                const col = sectorColor(c.title);
+                return (
+                  <span key={c.id} className={`${col.badge} text-white text-xs font-bold px-2 py-1 rounded-full`}>
+                    {col.text}
+                  </span>
+                );
+              })}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Szektorok */}
+      <div className="divide-y divide-gray-100">
+        {competitions.map((comp) => {
+          const desc = safeField(comp.description);
+          const loc = safeField(comp.location);
+          const nts = safeField(comp.notes);
+          const imgUrl = safeField(comp.image_url);
+          const eventDate = safeField(comp.event_date);
+          const hasInfo = desc || loc || nts || imgUrl;
+          const col = sectorColor(comp.title);
+          const isOpen = openSectorId === comp.id;
+          const regs = comp.registrations || [];
+
+          return (
+            <div key={comp.id} className="bg-white">
+              {/* Szektor fejsor */}
+              <div
+                className="flex items-center justify-between px-5 py-3 cursor-pointer hover:bg-gray-50 transition-colors"
+                onClick={() => setOpenSectorId(isOpen ? null : comp.id)}>
+                <div className="flex items-center gap-3">
+                  <span className={`${col.badge} text-white text-sm font-bold w-8 h-8 rounded-full flex items-center justify-center flex-shrink-0`}>
+                    {col.text}
+                  </span>
+                  <div>
+                    <p className="font-bold text-gray-800 text-sm">{comp.title}</p>
+                    {eventDate && <p className="text-xs text-gray-400 flex items-center gap-1"><Calendar className="w-3 h-3" />{eventDate}</p>}
+                  </div>
+                </div>
+                <div className="flex items-center gap-2">
+                  {regs.length > 0 && (
+                    <span className="text-xs bg-blue-100 text-blue-700 font-bold px-2 py-0.5 rounded-full">
+                      {regs.length} csapat
+                    </span>
+                  )}
+                  {isOpen
+                    ? <ChevronUp className="w-4 h-4 text-gray-400" />
+                    : <ChevronDown className="w-4 h-4 text-gray-400" />}
+                </div>
+              </div>
+
+              {/* Szektor részletek */}
+              {isOpen && (
+                <div className={`px-5 pb-5 border-t-2 ${col.light}`}>
+                  {/* Kép */}
+                  {imgUrl && (
+                    <div className="mt-4 mb-4 rounded-xl overflow-hidden shadow-md">
+                      <img src={imgUrl} alt="Verseny képe" className="w-full object-cover max-h-64" onError={(e) => { e.target.style.display = 'none'; }} />
+                    </div>
+                  )}
+
+                  {/* Leírás */}
+                  {hasInfo ? (
+                    <div className="mt-4 space-y-3">
+                      {desc && (
+                        <div>
+                          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                            <ClipboardList className="w-3 h-3" />Verseny kiírás
+                          </h3>
+                          <p className="text-gray-700 text-sm whitespace-pre-wrap">{desc}</p>
+                        </div>
+                      )}
+                      {loc && (
+                        <div>
+                          <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-1 flex items-center gap-1">
+                            <MapPin className="w-3 h-3" />Helyszín
+                          </h3>
+                          <p className="text-gray-700 text-sm">{loc}</p>
+                        </div>
+                      )}
+                      {nts && (
+                        <div className="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                          <h3 className="text-xs font-bold text-amber-700 uppercase tracking-wide mb-1">⚠️ Fontos tudnivalók</h3>
+                          <p className="text-gray-700 text-sm whitespace-pre-wrap">{nts}</p>
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <p className="mt-4 text-sm text-gray-400 italic">A verseny kiírása hamarosan megjelenik.</p>
+                  )}
+
+                  {/* Jelentkezők */}
+                  <div className="mt-4">
+                    <h3 className="text-xs font-bold text-gray-500 uppercase tracking-wide mb-2 flex items-center gap-1">
+                      <Users className="w-3 h-3" />Jelentkezett csapatok {regs.length > 0 ? `(${regs.length})` : ''}
+                    </h3>
+                    {regs.length > 0 ? (
+                      <div className="flex flex-wrap gap-2 mb-3">
+                        {regs.map((r) => (
+                          <div key={r.id} className="flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1">
+                            <span className="text-sm font-semibold text-blue-800">🎣 {r.team_name}</span>
+                            {user && (
+                              <button
+                                onClick={() => onRegister('delete', comp.id, r.id)}
+                                className="text-red-400 hover:text-red-600 ml-1">
+                                <X className="w-3 h-3" />
+                              </button>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <p className="text-xs text-gray-400 mb-3">Még nincs jelentkező csapat.</p>
+                    )}
+
+                    {/* Jelentkezés gomb (nem archív) */}
+                    {!isArchived && (
+                      <button
+                        onClick={() => onRegister('open', comp.id, null)}
+                        className="w-full py-2 bg-blue-600 text-white rounded-lg text-sm font-bold hover:bg-blue-700 flex items-center justify-center gap-2">
+                        <Plus className="w-4 h-4" />Csapat jelentkezése
+                      </button>
+                    )}
+                  </div>
+
+                  {/* Eredmények gomb */}
+                  <div className="mt-3">
+                    <button
+                      onClick={() => isArchived ? onOpenArchived(comp.id) : onOpenCompetition(comp.id)}
+                      className={`w-full py-2 rounded-lg text-sm font-bold flex items-center justify-center gap-2 ${isArchived ? 'bg-gray-600 text-white hover:bg-gray-700' : 'bg-green-600 text-white hover:bg-green-700'}`}>
+                      <Trophy className="w-4 h-4" />Eredmények megtekintése
+                    </button>
+                  </div>
+                </div>
+              )}
+            </div>
+          );
+        })}
+      </div>
+    </div>
+  );
+};
+
+// ── REGISZTRÁCIÓS MODAL ───────────────────────────────────────────────
+const RegistrationModal = ({ competitionId, onClose, onSubmit }) => {
+  const [teamName, setTeamName] = useState('');
+  const [submitting, setSubmitting] = useState(false);
+  const [error, setError] = useState('');
+
+  const handleSubmit = async () => {
+    if (!teamName.trim()) { setError('Add meg a csapat nevét!'); return; }
+    setSubmitting(true);
+    setError('');
+    try {
+      await onSubmit(competitionId, teamName.trim());
+      onClose();
+    } catch (err) {
+      setError('Hiba a jelentkezés során: ' + err.message);
+    } finally { setSubmitting(false); }
+  };
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
+        <div className="flex items-center justify-between mb-4">
+          <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
+            <Fish className="w-5 h-5 text-blue-600" />Csapat Jelentkezése
+          </h2>
+          <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+        </div>
+        <p className="text-sm text-gray-500 mb-4">A csapatnév megjelenik a verseny kiírásában a többi jelentkező között.</p>
+        <input
+          type="text"
+          value={teamName}
+          onChange={(e) => setTeamName(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+          placeholder="Csapat neve pl.: Pontyos Pál"
+          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm mb-2"
+          autoFocus
+        />
+        {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
+        <div className="flex gap-3 mt-4">
+          <button onClick={onClose} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold text-sm">Mégse</button>
+          <button onClick={handleSubmit} disabled={submitting}
+            className="flex-1 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm disabled:bg-gray-400">
+            {submitting ? 'Küldés...' : 'Jelentkezés ✓'}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
 
 // ── FŐ KOMPONENS ──────────────────────────────────────────────────────
 export default function FishingCompetition() {
@@ -190,24 +392,25 @@ export default function FishingCompetition() {
   const [archivedExpandedId, setArchivedExpandedId] = useState(null);
   const [showShareToast, setShowShareToast] = useState(false);
   const [pageViews, setPageViews] = useState({ today: 0, week: 0, total: 0, mobil: 0, pc: 0 });
+
+  // Verseny info mezők
   const [description, setDescription] = useState('');
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
+  const [imageUrl, setImageUrl] = useState('');
+  const [eventGroup, setEventGroup] = useState('');
+  const [eventDate, setEventDate] = useState('');
   const [showCompetitionInfo, setShowCompetitionInfo] = useState(false);
   const [showLoginModal, setShowLoginModal] = useState(false);
-  const [mainPageInfo, setMainPageInfo] = useState({ description: '', location: '', notes: '', title: '' });
+  const [saveStatus, setSaveStatus] = useState('idle');
 
-  // Mentés állapot visszajelzéshez
-  const [saveStatus, setSaveStatus] = useState('idle'); // 'idle' | 'saving' | 'saved' | 'error'
+  // Regisztráció
+  const [registrationModal, setRegistrationModal] = useState(null); // competitionId vagy null
 
-  // Debounce timerek
   const saveTimers = useRef({});
-  // Az aktuális competitionId ref-ben is tárolva, hogy a mentőfüggvény mindig friss értéket látsson
   const competitionIdRef = useRef(null);
 
-  useEffect(() => {
-    competitionIdRef.current = competitionId;
-  }, [competitionId]);
+  useEffect(() => { competitionIdRef.current = competitionId; }, [competitionId]);
 
   useEffect(() => {
     trackVisit();
@@ -251,50 +454,56 @@ export default function FishingCompetition() {
     finally { setLoading(false); }
   };
 
+  // Betölti az összes versenyt + a hozzájuk tartozó regisztrációkat
   const loadCompetitions = async () => {
     try {
       setDbError(null);
       const { data, error } = await supabase.from('competitions').select('*').order('created_at', { ascending: false });
       if (error) { setDbError('Versenyek betöltése sikertelen: ' + error.message); return; }
       const comps = data || [];
-      setCompetitions(comps);
-      const active = comps.find(c => !c.archived);
+
+      // Regisztrációk betöltése
+      const { data: regsData } = await supabase.from('registrations').select('*').order('created_at', { ascending: true });
+      const regs = regsData || [];
+
+      // Regisztrációkat hozzárendeli a versenyekhez
+      const compsWithRegs = comps.map(c => ({
+        ...c,
+        registrations: regs.filter(r => r.competition_id === c.id)
+      }));
+
+      setCompetitions(compsWithRegs);
+
+      // Aktív verseny alapértékeinek betöltése az admin szerkesztőhöz
+      const active = compsWithRegs.find(c => !c.archived);
       if (active) {
-        const desc = safeField(active.description);
-        const loc  = safeField(active.location);
-        const nts  = safeField(active.notes);
-        const ttl  = safeField(active.title) || 'Horgászverseny';
-        setMainPageInfo({ description: desc, location: loc, notes: nts, title: ttl });
-        setTitle(ttl);
         setCompetitionId(active.id);
         competitionIdRef.current = active.id;
-        setDescription(desc);
-        setLocation(loc);
-        setNotes(nts);
+        setTitle(safeField(active.title) || 'Horgászverseny');
+        setDescription(safeField(active.description));
+        setLocation(safeField(active.location));
+        setNotes(safeField(active.notes));
+        setImageUrl(safeField(active.image_url));
+        setEventGroup(safeField(active.event_group));
+        setEventDate(safeField(active.event_date));
       }
     } catch (err) { setDbError('Váratlan hiba: ' + err.message); }
   };
 
-  const handleLogin = async (e) => {
-    e && e.preventDefault && e.preventDefault();
-    setLoginError('');
-    setLoading(true);
+  const handleLogin = async () => {
+    setLoginError(''); setLoading(true);
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) throw error;
-      setUser(data.user);
-      setShowLoginModal(false);
-      setEmail(''); setPassword('');
+      setUser(data.user); setShowLoginModal(false); setEmail(''); setPassword('');
       await loadCompetitions();
     } catch { setLoginError('Hibás email vagy jelszó'); }
     finally { setLoading(false); }
   };
 
   const handleLogout = async () => {
-    try {
-      await supabase.auth.signOut();
-      setUser(null); setView('home'); setCompetitors([]);
-    } catch (err) { console.error(err); }
+    try { await supabase.auth.signOut(); setUser(null); setView('home'); setCompetitors([]); }
+    catch (err) { console.error(err); }
   };
 
   const buildCompetitors = async (competitionDbId) => {
@@ -305,11 +514,11 @@ export default function FishingCompetition() {
       const { data: meas, error: me } = await supabase
         .from('measurements').select('*').eq('competitor_id', c.id).order('created_at', { ascending: true });
       if (me) throw me;
-      const totalNagyhal   = meas.reduce((s, m) => s + (m.nagyhal   || 0), 0);
-      const totalAprohal   = meas.reduce((s, m) => s + (m.aprohal   || 0), 0);
+      const totalNagyhal = meas.reduce((s, m) => s + (m.nagyhal || 0), 0);
+      const totalAprohal = meas.reduce((s, m) => s + (m.aprohal || 0), 0);
       const totalDarabszam = meas.reduce((s, m) => s + (m.darabszam || 0), 0);
-      const mindosszesen   = totalNagyhal + totalAprohal;
-      const nagyhals       = meas.filter(m => m.nagyhal > 0).map(m => m.nagyhal);
+      const mindosszesen = totalNagyhal + totalAprohal;
+      const nagyhals = meas.filter(m => m.nagyhal > 0).map(m => m.nagyhal);
       return { ...c, measurements: meas, totalNagyhal, totalAprohal, totalDarabszam, mindosszesen, nagyhals };
     }));
   };
@@ -319,14 +528,14 @@ export default function FishingCompetition() {
       setLoading(true); setDbError(null);
       const { data: comp, error: ce } = await supabase.from('competitions').select('*').eq('id', compId).single();
       if (ce) throw ce;
-      const ttl  = safeField(comp.title) || 'Horgászverseny';
-      const desc = safeField(comp.description);
-      const loc  = safeField(comp.location);
-      const nts  = safeField(comp.notes);
-      setCompetitionId(comp.id);
-      competitionIdRef.current = comp.id;
-      setTitle(ttl); setDescription(desc); setLocation(loc); setNotes(nts);
-      setMainPageInfo({ description: desc, location: loc, notes: nts, title: ttl });
+      setCompetitionId(comp.id); competitionIdRef.current = comp.id;
+      setTitle(safeField(comp.title) || 'Horgászverseny');
+      setDescription(safeField(comp.description));
+      setLocation(safeField(comp.location));
+      setNotes(safeField(comp.notes));
+      setImageUrl(safeField(comp.image_url));
+      setEventGroup(safeField(comp.event_group));
+      setEventDate(safeField(comp.event_date));
       const built = await buildCompetitors(comp.id);
       setCompetitors(built);
       setView('competition');
@@ -354,7 +563,7 @@ export default function FishingCompetition() {
 
   const archiveCompetition = async () => {
     if (!competitionId) return;
-    if (!window.confirm('Biztosan lezárod és áthelyezed a "Korábbi Versenyek" közé?')) return;
+    if (!window.confirm('Biztosan lezárod ezt a versenyt?')) return;
     try {
       const { error } = await supabase.from('competitions').update({ archived: true }).eq('id', competitionId);
       if (error) throw error;
@@ -374,14 +583,13 @@ export default function FishingCompetition() {
     try {
       const now = new Date();
       const dateStr = now.getFullYear() + '.' + String(now.getMonth() + 1).padStart(2, '0') + '.' + String(now.getDate()).padStart(2, '0');
-      const { data, error } = await supabase.from('competitions').insert([{ title: 'Horgászverseny - ' + dateStr, archived: false }]).select('*');
+      const { data, error } = await supabase.from('competitions')
+        .insert([{ title: 'Horgászverseny - ' + dateStr, archived: false }]).select('*');
       if (error) throw error;
       const comp = data[0];
-      setCompetitionId(comp.id);
-      competitionIdRef.current = comp.id;
+      setCompetitionId(comp.id); competitionIdRef.current = comp.id;
       setTitle(safeField(comp.title));
-      setDescription(''); setLocation(''); setNotes('');
-      setMainPageInfo({ description: '', location: '', notes: '', title: safeField(comp.title) });
+      setDescription(''); setLocation(''); setNotes(''); setImageUrl(''); setEventGroup(''); setEventDate('');
       setCompetitors([]);
       await loadCompetitions();
       setView('competition');
@@ -398,61 +606,64 @@ export default function FishingCompetition() {
     } catch (err) { alert('Hiba: ' + err.message); }
   };
 
-  const saveTitle = async (newTitle) => {
-    if (!competitionIdRef.current) return;
-    try {
-      const { error } = await supabase.from('competitions').update({ title: newTitle }).eq('id', competitionIdRef.current);
-      if (error) throw error;
-      setCompetitions(prev => prev.map(c => c.id === competitionIdRef.current ? { ...c, title: newTitle } : c));
-      setMainPageInfo(prev => ({ ...prev, title: newTitle }));
-    } catch (err) { console.error('Cím mentési hiba:', err); }
-  };
-
-  // Tényleges DB mentés – ref-et használ, nem state-et, hogy mindig friss ID-t kapjon
   const saveFieldToDb = useCallback(async (field, value) => {
     const cid = competitionIdRef.current;
-    if (!cid) {
-      setDbError('Mentési hiba: nincs aktív verseny kiválasztva. Frissítsd az oldalt!');
-      setSaveStatus('error');
-      return;
-    }
+    if (!cid) { setDbError('Nincs aktív verseny!'); setSaveStatus('error'); return; }
     setSaveStatus('saving');
     try {
       const { error } = await supabase.from('competitions').update({ [field]: value }).eq('id', cid);
-      if (error) {
-        setDbError('Mentési hiba (' + field + '): ' + error.message);
-        setSaveStatus('error');
-      } else {
-        setDbError(null);
-        setSaveStatus('saved');
+      if (error) { setDbError('Mentési hiba (' + field + '): ' + error.message); setSaveStatus('error'); }
+      else {
+        setDbError(null); setSaveStatus('saved');
         setTimeout(() => setSaveStatus('idle'), 2000);
+        // Frissíti a competitions listát is
+        setCompetitions(prev => prev.map(c => c.id === cid ? { ...c, [field]: value } : c));
       }
-    } catch (err) {
-      setDbError('Mentési hiba: ' + err.message);
-      setSaveStatus('error');
-    }
+    } catch (err) { setDbError('Mentési hiba: ' + err.message); setSaveStatus('error'); }
   }, []);
 
-  // onChange: azonnal frissíti a UI-t + debounce-olt mentés
   const handleInfoChange = (field, value, setter) => {
     setter(value);
-    setMainPageInfo(prev => ({ ...prev, [field]: value }));
     setSaveStatus('saving');
     if (saveTimers.current[field]) clearTimeout(saveTimers.current[field]);
-    saveTimers.current[field] = setTimeout(() => {
-      saveFieldToDb(field, value);
-    }, 500);
+    saveTimers.current[field] = setTimeout(() => saveFieldToDb(field, value), 500);
   };
 
-  // onBlur: azonnal ment, törli a debounce timert (nehogy duplán menjen)
   const handleInfoBlur = (field, value) => {
-    if (saveTimers.current[field]) {
-      clearTimeout(saveTimers.current[field]);
-      saveTimers.current[field] = null;
-    }
+    if (saveTimers.current[field]) { clearTimeout(saveTimers.current[field]); saveTimers.current[field] = null; }
     saveFieldToDb(field, value);
   };
 
+  // Verseny cím mentése
+  const saveTitle = async (newTitle) => {
+    if (!competitionIdRef.current) return;
+    try {
+      await supabase.from('competitions').update({ title: newTitle }).eq('id', competitionIdRef.current);
+      setCompetitions(prev => prev.map(c => c.id === competitionIdRef.current ? { ...c, title: newTitle } : c));
+    } catch (err) { console.error('Cím mentési hiba:', err); }
+  };
+
+  // Regisztráció kezelése
+  const handleRegistration = async (action, compId, regId) => {
+    if (action === 'open') {
+      setRegistrationModal(compId);
+    } else if (action === 'delete') {
+      if (!window.confirm('Biztosan törlöd ezt a csapatot?')) return;
+      try {
+        const { error } = await supabase.from('registrations').delete().eq('id', regId);
+        if (error) throw error;
+        await loadCompetitions();
+      } catch (err) { alert('Hiba: ' + err.message); }
+    }
+  };
+
+  const submitRegistration = async (compId, teamName) => {
+    const { error } = await supabase.from('registrations').insert([{ competition_id: compId, team_name: teamName }]);
+    if (error) throw error;
+    await loadCompetitions();
+  };
+
+  // Versenyzők
   const addCompetitor = async () => {
     if (!newName.trim() || competitors.length >= 45 || !competitionId) return;
     try {
@@ -466,7 +677,6 @@ export default function FishingCompetition() {
   };
 
   const confirmDeleteCompetitor = (id, name) => setDeleteConfirm({ id, name });
-
   const executeDeleteCompetitor = async () => {
     if (!deleteConfirm) return;
     try {
@@ -535,77 +745,132 @@ export default function FishingCompetition() {
     return { top3Nagyhal, top6Mindosszesen };
   }, [archivedCompetitors]);
 
+  // Versenyeket csoportosítja event_group szerint (vagy title+date alapján)
+  const groupedCompetitions = useMemo(() => {
+    const active = competitions.filter(c => !c.archived);
+    const archived = competitions.filter(c => c.archived);
+
+    const groupBy = (list) => {
+      const groups = {};
+      list.forEach(c => {
+        const key = safeField(c.event_group) || c.id; // ha nincs csoport, önmaga a kulcs
+        if (!groups[key]) groups[key] = { name: safeField(c.event_group) || safeField(c.title) || 'Horgászverseny', comps: [] };
+        groups[key].comps.push(c);
+      });
+      return Object.values(groups);
+    };
+
+    return { active: groupBy(active), archived: groupBy(archived) };
+  }, [competitions]);
+
   const activeCompetitions = competitions.filter(c => !c.archived);
   const archivedList = competitions.filter(c => c.archived);
 
-  // Mentés státusz jelző
+  // Mentés státusz
   const SaveIndicator = () => {
     if (saveStatus === 'idle') return null;
-    if (saveStatus === 'saving') return (
-      <span className="text-xs text-blue-500 flex items-center gap-1 animate-pulse">
-        <Save className="w-3 h-3" />Mentés...
-      </span>
-    );
-    if (saveStatus === 'saved') return (
-      <span className="text-xs text-green-600 flex items-center gap-1">
-        <CheckCircle className="w-3 h-3" />Mentve ✓
-      </span>
-    );
-    if (saveStatus === 'error') return (
-      <span className="text-xs text-red-500 flex items-center gap-1">
-        <AlertTriangle className="w-3 h-3" />Mentési hiba!
-      </span>
-    );
+    if (saveStatus === 'saving') return <span className="text-xs text-blue-500 flex items-center gap-1 animate-pulse"><Save className="w-3 h-3" />Mentés...</span>;
+    if (saveStatus === 'saved') return <span className="text-xs text-green-600 flex items-center gap-1"><CheckCircle className="w-3 h-3" />Mentve ✓</span>;
+    if (saveStatus === 'error') return <span className="text-xs text-red-500 flex items-center gap-1"><AlertTriangle className="w-3 h-3" />Mentési hiba!</span>;
     return null;
   };
 
-  // Admin info szerkesztő – ugyanaz a JSX inline kerül be mindkét nézetbe
+  // Admin info szerkesztő — kiválasztott versenyhez
   const renderAdminInfoEditor = () => (
-    <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+    <div className="bg-white rounded-xl shadow-lg p-4 mb-4 border-2 border-amber-200">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
-          <h2 className="text-lg font-bold text-gray-800">📋 Verseny Információk</h2>
+          <h2 className="text-base font-bold text-gray-800">⚙️ Verseny Szerkesztése</h2>
           <SaveIndicator />
         </div>
         <button onClick={() => setShowCompetitionInfo(!showCompetitionInfo)}
           className="px-3 py-1 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 text-sm font-semibold">
-          {showCompetitionInfo ? '▲ Bezár' : '▼ Szerkeszt'}
+          {showCompetitionInfo ? '▲ Bezár' : '▼ Megnyit'}
         </button>
       </div>
+
+      {/* Aktív verseny választó */}
+      {activeCompetitions.length > 1 && (
+        <div className="mb-3">
+          <label className="block text-xs font-bold text-gray-500 uppercase mb-1">Szerkesztett verseny</label>
+          <select
+            value={competitionId || ''}
+            onChange={(e) => loadCompetition(e.target.value)}
+            className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none">
+            {activeCompetitions.map(c => <option key={c.id} value={c.id}>{c.title}</option>)}
+          </select>
+        </div>
+      )}
+
       {showCompetitionInfo && (
         <div className="space-y-3">
-          {!competitionIdRef.current && (
-            <div className="bg-yellow-50 border-2 border-yellow-300 rounded-lg p-3 text-sm text-yellow-800">
-              ⚠️ Nincs aktív verseny. Hozz létre egyet a Versenyek menüben, majd a szerkesztő automatikusan aktiválódik.
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Cím</label>
+              <input type="text" value={title}
+                onChange={(e) => { setTitle(e.target.value); handleInfoChange('title', e.target.value, setTitle); }}
+                onBlur={(e) => handleInfoBlur('title', e.target.value)}
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" />
             </div>
-          )}
+            <div>
+              <label className="block text-xs font-semibold text-gray-600 mb-1">Verseny dátuma</label>
+              <input type="text" value={eventDate}
+                onChange={(e) => handleInfoChange('event_date', e.target.value, setEventDate)}
+                onBlur={(e) => handleInfoBlur('event_date', e.target.value)}
+                placeholder="pl. 2026.02.28"
+                className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" />
+            </div>
+          </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Verseny leírása / kiírás</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">
+              Eseménycsoport neve <span className="text-gray-400 font-normal">(azonos névvel csoportosítja a szektorokat)</span>
+            </label>
+            <input type="text" value={eventGroup}
+              onChange={(e) => handleInfoChange('event_group', e.target.value, setEventGroup)}
+              onBlur={(e) => handleInfoBlur('event_group', e.target.value)}
+              placeholder="pl. 2026.02.28 Tavirózsa-tó Verseny"
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" />
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Verseny leírása</label>
             <textarea value={description}
               onChange={(e) => handleInfoChange('description', e.target.value, setDescription)}
               onBlur={(e) => handleInfoBlur('description', e.target.value)}
-              placeholder="Pl.: Egynapos horgászverseny, regisztráció 6:00-tól, verseny időtartama: 8:00-16:00"
-              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
+              placeholder="Verseny kiírás, szabályok..."
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" rows="3" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Helyszín</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Helyszín</label>
             <input type="text" value={location}
               onChange={(e) => handleInfoChange('location', e.target.value, setLocation)}
               onBlur={(e) => handleInfoBlur('location', e.target.value)}
-              placeholder="Pl.: Tisza-tó, Abádszalók, 3. meder"
-              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" />
+              placeholder="Halastó neve, cím..."
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" />
           </div>
           <div>
-            <label className="block text-sm font-semibold text-gray-700 mb-1">Egyéb közlendők / szabályok</label>
+            <label className="block text-xs font-semibold text-gray-600 mb-1">Fontos tudnivalók</label>
             <textarea value={notes}
               onChange={(e) => handleInfoChange('notes', e.target.value, setNotes)}
               onBlur={(e) => handleInfoBlur('notes', e.target.value)}
-              placeholder="Pl.: Tiltott csalik, minimális méret szabályok, értékelési rendszer, díjazás"
-              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm" rows="3" />
+              placeholder="Tiltott csalik, díjazás, egyéb szabályok..."
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" rows="2" />
           </div>
-          <p className="text-xs text-gray-400 italic">
-            💡 Az adatok a mező elhagyásakor (<strong>kattintás máshová</strong>) azonnal mentődnek az adatbázisba.
-          </p>
+          <div>
+            <label className="block text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
+              <ImageIcon className="w-3 h-3" />Kép URL-je <span className="text-gray-400 font-normal">(halastó fotója, kiírás képe)</span>
+            </label>
+            <input type="text" value={imageUrl}
+              onChange={(e) => handleInfoChange('image_url', e.target.value, setImageUrl)}
+              onBlur={(e) => handleInfoBlur('image_url', e.target.value)}
+              placeholder="https://... (kép linkje)"
+              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" />
+            {imageUrl && (
+              <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
+                <img src={imageUrl} alt="Előnézet" className="w-full max-h-40 object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+              </div>
+            )}
+          </div>
+          <p className="text-xs text-gray-400 italic">💡 Mező elhagyásakor automatikusan ment.</p>
         </div>
       )}
     </div>
@@ -618,13 +883,12 @@ export default function FishingCompetition() {
   const DeleteModal = () => deleteConfirm ? (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-xl shadow-2xl p-6 w-full max-w-sm">
-        <div className="flex items-center gap-3 mb-4"><div className="bg-red-100 p-2 rounded-full"><Trash2 className="w-6 h-6 text-red-600" /></div><h2 className="text-lg font-bold">Versenyző törlése</h2></div>
-        <p className="text-gray-600 mb-2">Biztosan törlöd ezt a versenyzőt?</p>
+        <h2 className="text-lg font-bold mb-3">Versenyző törlése</h2>
         <p className="text-red-700 font-bold text-center bg-red-50 rounded-lg py-2 px-3 mb-3">„{deleteConfirm.name}"</p>
-        <p className="text-gray-500 text-xs mb-5 text-center">Az összes mérési adatával együtt törlődik!<br/>Ez a művelet <strong>nem visszavonható</strong>.</p>
+        <p className="text-gray-500 text-xs mb-5 text-center">Az összes mérési adatával együtt törlődik. Ez nem visszavonható.</p>
         <div className="flex gap-3">
-          <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg hover:bg-gray-300 font-semibold">Mégse</button>
-          <button onClick={executeDeleteCompetitor} className="flex-1 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 font-semibold flex items-center justify-center gap-2"><Trash2 className="w-4 h-4" />Törlés</button>
+          <button onClick={() => setDeleteConfirm(null)} className="flex-1 py-2 bg-gray-200 text-gray-700 rounded-lg font-semibold">Mégse</button>
+          <button onClick={executeDeleteCompetitor} className="flex-1 py-2 bg-red-600 text-white rounded-lg font-semibold">Törlés</button>
         </div>
       </div>
     </div>
@@ -632,7 +896,10 @@ export default function FishingCompetition() {
 
   if (loading) return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 flex items-center justify-center">
-      <div className="text-xl text-gray-600">Betöltés...</div>
+      <div className="flex flex-col items-center gap-3">
+        <Fish className="w-12 h-12 text-green-500 animate-pulse" />
+        <p className="text-gray-600 font-semibold">Betöltés...</p>
+      </div>
     </div>
   );
 
@@ -646,55 +913,71 @@ export default function FishingCompetition() {
           <DeleteModal />
           {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
           <DbErrorBanner dbError={dbError} setDbError={setDbError} />
-          <div className="bg-gradient-to-r from-gray-600 to-gray-800 text-white p-5 rounded-lg shadow-xl mb-4">
-            <div className="flex items-center gap-3"><Archive className="w-8 h-8" /><h1 className="text-3xl font-bold">{archivedCompetition.title}</h1></div>
-            <p className="mt-1 text-gray-300 text-sm">Korábbi verseny — Lezárt eredmények</p>
+          <div className="bg-gradient-to-r from-gray-600 to-gray-800 text-white p-5 rounded-xl shadow-xl mb-4">
+            <div className="flex items-center gap-3"><Archive className="w-7 h-7" /><div><h1 className="text-2xl font-bold">{archivedCompetition.title}</h1><p className="text-gray-300 text-sm mt-0.5">Lezárt verseny · {formatDate(archivedCompetition.created_at)}</p></div></div>
           </div>
           <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={goHome} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><Home className="w-4 h-4" />Főoldal</button>
-            <button onClick={() => setView('list')} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><FolderOpen className="w-4 h-4" />Versenyek</button>
-            {user && <button onClick={() => unarchiveCompetition(archivedCompetition.id)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center gap-2 shadow-md"><RefreshCw className="w-4 h-4" />Visszaállítás</button>}
+            <button onClick={goHome} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow"><Home className="w-4 h-4" />Főoldal</button>
+            <button onClick={() => setView('list')} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow"><FolderOpen className="w-4 h-4" />Versenyek</button>
+            {user && <button onClick={() => unarchiveCompetition(archivedCompetition.id)} className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 text-sm font-semibold flex items-center gap-2 shadow"><RefreshCw className="w-4 h-4" />Visszaállítás</button>}
             <AuthButton />
           </div>
-          <InfoBlock info={{ description: safeField(archivedCompetition.description), location: safeField(archivedCompetition.location), notes: safeField(archivedCompetition.notes) }} />
-          <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
+
+          {safeField(archivedCompetition.image_url) && (
+            <div className="mb-4 rounded-xl overflow-hidden shadow-lg">
+              <img src={archivedCompetition.image_url} alt="Verseny" className="w-full max-h-72 object-cover" />
+            </div>
+          )}
+
+          {(safeField(archivedCompetition.description) || safeField(archivedCompetition.location) || safeField(archivedCompetition.notes)) && (
+            <div className="bg-white rounded-xl shadow p-4 mb-4">
+              {safeField(archivedCompetition.description) && <div className="mb-3"><h3 className="text-xs font-bold text-gray-500 uppercase mb-1">📋 Kiírás</h3><p className="text-gray-700 text-sm whitespace-pre-wrap">{archivedCompetition.description}</p></div>}
+              {safeField(archivedCompetition.location) && <div className="mb-3"><h3 className="text-xs font-bold text-gray-500 uppercase mb-1">📍 Helyszín</h3><p className="text-gray-700 text-sm">{archivedCompetition.location}</p></div>}
+              {safeField(archivedCompetition.notes) && <div><h3 className="text-xs font-bold text-amber-600 uppercase mb-1">⚠️ Tudnivalók</h3><p className="text-gray-700 text-sm whitespace-pre-wrap">{archivedCompetition.notes}</p></div>}
+            </div>
+          )}
+
+          <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
             <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead><tr className="bg-gray-100 border-b-2 border-gray-300">
                   <th className="px-2 py-2 text-center">#</th><th className="px-2 py-2 text-left">Név</th>
-                  <th className="px-2 py-2 text-center">Nagyhal (g)</th><th className="px-2 py-2 text-center">Apróhal (g)</th>
-                  <th className="px-2 py-2 text-center">Összesen (g)</th><th className="px-2 py-2 text-center">Darabszám</th>
+                  <th className="px-2 py-2 text-center">Nagyhal</th><th className="px-2 py-2 text-center">Apróhal</th>
+                  <th className="px-2 py-2 text-center">Összesen</th><th className="px-2 py-2 text-center">Db</th>
                 </tr></thead>
                 <tbody>
                   {archivedCompetitors.map((c, idx) => (
                     <React.Fragment key={c.id}>
-                      <tr className={idx % 2 === 0 ? 'bg-white hover:bg-green-50 cursor-pointer' : 'bg-gray-50 hover:bg-green-50 cursor-pointer'} onClick={() => setArchivedExpandedId(archivedExpandedId === c.id ? null : c.id)}>
+                      <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-green-50 cursor-pointer`} onClick={() => setArchivedExpandedId(archivedExpandedId === c.id ? null : c.id)}>
                         <td className="px-2 py-2 text-center font-bold text-gray-600">{idx + 1}</td>
-                        <td className="px-2 py-2"><div className="flex items-center gap-2"><span className="font-semibold">{c.name}</span>{c.measurements.length > 0 && <span className="text-xs text-blue-600">{archivedExpandedId === c.id ? '▲' : '▼'}</span>}</div></td>
-                        <td className="px-2 py-2 text-center"><span className="font-bold text-green-700">{c.totalNagyhal} g</span></td>
-                        <td className="px-2 py-2 text-center"><span className="font-bold text-blue-700">{c.totalAprohal} g</span></td>
-                        <td className="px-2 py-2 text-center"><span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{c.mindosszesen} g</span></td>
-                        <td className="px-2 py-2 text-center"><span className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">{c.totalDarabszam} db</span></td>
+                        <td className="px-2 py-2 font-semibold">{c.name} {c.measurements.length > 0 && <span className="text-xs text-blue-500">{archivedExpandedId === c.id ? '▲' : '▼'}</span>}</td>
+                        <td className="px-2 py-2 text-center font-bold text-green-700">{c.totalNagyhal} g</td>
+                        <td className="px-2 py-2 text-center font-bold text-blue-700">{c.totalAprohal} g</td>
+                        <td className="px-2 py-2 text-center"><span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{c.mindosszesen} g</span></td>
+                        <td className="px-2 py-2 text-center"><span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">{c.totalDarabszam} db</span></td>
                       </tr>
                       {archivedExpandedId === c.id && c.measurements.length > 0 && (
-                        <tr><td colSpan={6} className="p-0"><div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
-                          <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
-                            <th className="text-left py-1">#</th><th className="text-left py-1">Időpont</th>
-                            <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
-                            <th className="text-center py-1">Darab</th><th className="text-center py-1">Sor összesen</th>
-                          </tr></thead><tbody>
-                            {c.measurements.map((m, mi) => (
-                              <tr key={m.id} className="border-b border-green-100">
-                                <td className="py-1 text-gray-500">{mi + 1}.</td><td className="py-1 text-gray-500">{formatDateTime(m.created_at)}</td>
-                                <td className="py-1 text-center">{m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : <span className="text-gray-300">-</span>}</td>
-                                <td className="py-1 text-center">{m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : <span className="text-gray-300">-</span>}</td>
-                                <td className="py-1 text-center">{m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam} db</span> : <span className="text-gray-300">-</span>}</td>
-                                <td className="py-1 text-center"><span className="text-yellow-700 font-bold">{m.nagyhal + m.aprohal} g</span></td>
-                              </tr>
-                            ))}
-                          </tbody></table>
-                        </div></td></tr>
+                        <tr><td colSpan={6} className="p-0">
+                          <div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
+                            <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
+                              <th className="text-left py-1">#</th><th className="py-1">Időpont</th>
+                              <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
+                              <th className="text-center py-1">Db</th><th className="text-center py-1">Sor össz.</th>
+                            </tr></thead><tbody>
+                              {c.measurements.map((m, mi) => (
+                                <tr key={m.id} className="border-b border-green-100">
+                                  <td className="py-1 text-gray-500">{mi + 1}.</td>
+                                  <td className="py-1 text-gray-500">{formatDateTime(m.created_at)}</td>
+                                  <td className="py-1 text-center">{m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : '-'}</td>
+                                  <td className="py-1 text-center">{m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : '-'}</td>
+                                  <td className="py-1 text-center">{m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam}</span> : '-'}</td>
+                                  <td className="py-1 text-center font-bold text-yellow-700">{m.nagyhal + m.aprohal} g</td>
+                                </tr>
+                              ))}
+                            </tbody></table>
+                          </div>
+                        </td></tr>
                       )}
                     </React.Fragment>
                   ))}
@@ -715,40 +998,39 @@ export default function FishingCompetition() {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
         <div className="max-w-4xl mx-auto">
-          {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
           <DbErrorBanner dbError={dbError} setDbError={setDbError} />
-          <div className="bg-white rounded-lg shadow-2xl p-8">
-            <div className="flex justify-between items-center mb-6">
+          <div className="bg-white rounded-xl shadow-2xl p-6">
+            <div className="flex justify-between items-center mb-5">
               <h2 className="text-2xl font-bold text-gray-800 flex items-center gap-3"><FolderOpen className="w-7 h-7 text-blue-600" />Versenyek</h2>
-              <button onClick={goHome} className="flex items-center gap-2 text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600"><Home className="w-4 h-4" />Főoldal</button>
+              <button onClick={goHome} className="text-sm font-semibold px-3 py-1.5 rounded-lg hover:bg-gray-100 text-gray-600 flex items-center gap-1"><Home className="w-4 h-4" />Főoldal</button>
             </div>
             {user && (
-              <button onClick={createNewCompetition} className="w-full mb-6 bg-green-600 text-white py-3 rounded-lg hover:bg-green-700 font-semibold flex items-center justify-center gap-2">
+              <button onClick={createNewCompetition} className="w-full mb-5 bg-green-600 text-white py-3 rounded-xl hover:bg-green-700 font-bold flex items-center justify-center gap-2">
                 <Plus className="w-5 h-5" />Új Verseny Indítása
               </button>
             )}
-            <h3 className="text-base font-bold text-green-700 mb-2 flex items-center gap-2"><Fish className="w-4 h-4" />Aktuális Versenyek</h3>
-            <div className="space-y-3 mb-6">
+            <h3 className="text-sm font-bold text-green-700 mb-2 uppercase">Aktív versenyek</h3>
+            <div className="space-y-3 mb-5">
               {activeCompetitions.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Nincs aktív verseny</p>}
               {activeCompetitions.map(comp => (
-                <div key={comp.id} className="border-2 rounded-lg p-4 flex justify-between items-center border-gray-200 hover:border-green-300 transition-colors">
-                  <div className="flex-1"><h3 className="text-lg font-bold text-gray-800">{comp.title}</h3><p className="text-gray-500 text-sm">{formatDate(comp.created_at)}</p></div>
+                <div key={comp.id} className="border-2 rounded-xl p-4 flex justify-between items-center border-green-200 hover:border-green-400 transition-colors">
+                  <div><p className="font-bold text-gray-800">{comp.title}</p><p className="text-gray-400 text-xs">{formatDate(comp.created_at)}</p></div>
                   <div className="flex gap-2">
-                    <button onClick={() => loadCompetition(comp.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg hover:bg-blue-700 text-sm font-semibold">Megnyitás</button>
-                    {user && <button onClick={() => deleteCompetition(comp.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">Törlés</button>}
+                    <button onClick={() => loadCompetition(comp.id)} className="px-3 py-1.5 bg-blue-600 text-white rounded-lg text-sm font-semibold">Megnyitás</button>
+                    {user && <button onClick={() => deleteCompetition(comp.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-semibold">Törlés</button>}
                   </div>
                 </div>
               ))}
             </div>
-            <h3 className="text-base font-bold text-gray-600 mb-2 flex items-center gap-2"><Archive className="w-4 h-4" />Korábbi Versenyek</h3>
+            <h3 className="text-sm font-bold text-gray-500 mb-2 uppercase">Korábbi versenyek</h3>
             <div className="space-y-3">
-              {archivedList.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Még nincsenek lezárt versenyek</p>}
+              {archivedList.length === 0 && <p className="text-gray-400 text-sm text-center py-4">Nincs lezárt verseny</p>}
               {archivedList.map(comp => (
-                <div key={comp.id} className="border-2 rounded-lg p-4 flex justify-between items-center border-gray-200 bg-gray-50">
-                  <div className="flex-1"><h3 className="text-lg font-bold text-gray-700">{comp.title}</h3><p className="text-gray-400 text-sm">{formatDate(comp.created_at)}</p><span className="inline-block mt-1 bg-gray-400 text-white px-2 py-0.5 rounded-full text-xs font-semibold">Lezárt</span></div>
+                <div key={comp.id} className="border-2 rounded-xl p-4 flex justify-between items-center border-gray-200 bg-gray-50">
+                  <div><p className="font-bold text-gray-700">{comp.title}</p><p className="text-gray-400 text-xs">{formatDate(comp.created_at)} · Lezárt</p></div>
                   <div className="flex gap-2">
-                    <button onClick={() => loadArchivedCompetition(comp.id)} className="px-3 py-1.5 bg-gray-600 text-white rounded-lg hover:bg-gray-700 text-sm font-semibold">Megtekintés</button>
-                    {user && <button onClick={() => deleteCompetition(comp.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg hover:bg-red-700 text-sm font-semibold">Törlés</button>}
+                    <button onClick={() => loadArchivedCompetition(comp.id)} className="px-3 py-1.5 bg-gray-600 text-white rounded-lg text-sm font-semibold">Megtekintés</button>
+                    {user && <button onClick={() => deleteCompetition(comp.id)} className="px-3 py-1.5 bg-red-600 text-white rounded-lg text-sm font-semibold">Törlés</button>}
                   </div>
                 </div>
               ))}
@@ -760,42 +1042,46 @@ export default function FishingCompetition() {
   }
 
   // ══════════════════════════════════════════════════════════════════════
-  // NÉZET: AKTÍV VERSENY
+  // NÉZET: AKTÍV VERSENY (Admin táblázat)
   // ══════════════════════════════════════════════════════════════════════
   if (view === 'competition') {
     return (
       <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
         <div className="max-w-7xl mx-auto">
           <DeleteModal />
-          {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
+          {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
           <DbErrorBanner dbError={dbError} setDbError={setDbError} />
 
-          <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-5 rounded-lg shadow-xl mb-4">
+          {/* Fejléc */}
+          <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-5 rounded-xl shadow-xl mb-4">
             <div className="flex items-center gap-3">
               <Fish className="w-8 h-8" />
               {user
-                ? <input type="text" value={title} onChange={(e) => { setTitle(e.target.value); saveTitle(e.target.value); }}
-                    className="text-3xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white flex-1" placeholder="Verseny címe..." />
-                : <h1 className="text-3xl font-bold">{title}</h1>}
+                ? <input type="text" value={title}
+                    onChange={(e) => { setTitle(e.target.value); handleInfoChange('title', e.target.value, setTitle); }}
+                    onBlur={(e) => handleInfoBlur('title', e.target.value)}
+                    className="text-2xl font-bold bg-transparent border-b-2 border-transparent hover:border-white focus:border-white focus:outline-none text-white flex-1" />
+                : <h1 className="text-2xl font-bold">{title}</h1>}
             </div>
-            <p className="mt-1 text-green-100 text-sm">45 versenyző • Korlátlan mérés{user ? ' • Admin: ' + user.email : ''}</p>
+            <p className="mt-1 text-green-100 text-sm">45 versenyző · Korlátlan mérés{user ? ' · Admin: ' + user.email : ''}</p>
           </div>
 
+          {/* Nav */}
           <div className="flex flex-wrap gap-2 mb-4">
-            <button onClick={goHome} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><Home className="w-4 h-4" />Főoldal</button>
-            <button onClick={() => setView('list')} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><FolderOpen className="w-4 h-4" />Versenyek</button>
-            <button onClick={handleShare} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><Share2 className="w-4 h-4" />Megosztás</button>
-            <button onClick={() => loadCompetition(competitionId)} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><RefreshCw className="w-4 h-4" />Frissítés</button>
-            {user && <button onClick={archiveCompetition} className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold flex items-center gap-2 shadow-md"><Archive className="w-4 h-4" />Verseny Lezárása</button>}
+            <button onClick={goHome} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow"><Home className="w-4 h-4" />Főoldal</button>
+            <button onClick={() => setView('list')} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow"><FolderOpen className="w-4 h-4" />Versenyek</button>
+            <button onClick={handleShare} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow"><Share2 className="w-4 h-4" />Megosztás</button>
+            <button onClick={() => loadCompetition(competitionId)} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow"><RefreshCw className="w-4 h-4" />Frissítés</button>
+            {user && <button onClick={archiveCompetition} className="px-4 py-2 bg-amber-500 text-white rounded-lg hover:bg-amber-600 text-sm font-semibold flex items-center gap-2 shadow"><Archive className="w-4 h-4" />Lezárás</button>}
             <AuthButton />
           </div>
 
           {user && renderAdminInfoEditor()}
-          <InfoBlock info={mainPageInfo} />
 
+          {/* Versenyző hozzáadás */}
           {user && (
-            <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-              <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyző Hozzáadása</h2>
+            <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
+              <h2 className="text-base font-bold mb-3 text-gray-800">Versenyző Hozzáadása</h2>
               <div className="flex gap-3">
                 <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addCompetitor()}
@@ -810,17 +1096,17 @@ export default function FishingCompetition() {
             </div>
           )}
 
+          {/* Admin táblázat */}
           {user && (
-            <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-              <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
+            <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
+              <h2 className="text-base font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="bg-gray-100 border-b-2 border-gray-300">
                     <th className="px-2 py-2 text-center">#</th><th className="px-2 py-2 text-left">Név</th>
                     <th className="px-2 py-2 text-center">Nagyhal (g)</th><th className="px-2 py-2 text-center">Apróhal (g)</th>
-                    <th className="px-2 py-2 text-center">Darab</th><th className="px-2 py-2 text-center">Összesen (g)</th>
-                    <th className="px-2 py-2 text-center">Darabszám</th><th className="px-2 py-2 text-center">Rögzít</th>
-                    <th className="px-2 py-2 text-center">Törlés</th>
+                    <th className="px-2 py-2 text-center">Darab</th><th className="px-2 py-2 text-center">Összesen</th>
+                    <th className="px-2 py-2 text-center">Rögzít</th><th className="px-2 py-2 text-center">Törlés</th>
                   </tr></thead>
                   <tbody>
                     {competitors.map((c, idx) => {
@@ -831,135 +1117,151 @@ export default function FishingCompetition() {
                         <React.Fragment key={c.id}>
                           <tr className={idx % 2 === 0 ? 'bg-white border-b border-gray-200' : 'bg-blue-50 border-b border-gray-200'}>
                             <td className="px-2 py-2 text-center font-bold text-gray-700">{idx + 1}</td>
-                            <td className="px-2 py-2"><div className="flex items-center gap-2">
-                              <span className="font-semibold text-gray-800 cursor-pointer hover:text-blue-600" onClick={() => setExpandedAdminId(isExp ? null : c.id)}>{c.name}</span>
-                              {c.measurements.length > 0 && <span className="text-xs text-blue-600 cursor-pointer" onClick={() => setExpandedAdminId(isExp ? null : c.id)}>{isExp ? '▲' : '▼'}</span>}
-                            </div></td>
-                            <td className="px-2 py-2 text-center">
-                              {isEdit ? <input type="number" step="1" value={nagyhalaInput} onChange={(e) => setNagyhalaInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center text-sm" />
-                                : <div><span className="font-bold text-green-700">{c.totalNagyhal} g</span>{last && last.nagyhal > 0 && <p className="text-xs text-gray-400">(utolsó: {last.nagyhal}g)</p>}</div>}
+                            <td className="px-2 py-2">
+                              <span className="font-semibold cursor-pointer hover:text-blue-600" onClick={() => setExpandedAdminId(isExp ? null : c.id)}>
+                                {c.name} {c.measurements.length > 0 && <span className="text-xs text-blue-500">{isExp ? '▲' : '▼'}</span>}
+                              </span>
                             </td>
                             <td className="px-2 py-2 text-center">
-                              {isEdit ? <input type="number" step="1" value={aprohalaInput} onChange={(e) => setAprohalaInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center text-sm" />
-                                : <div><span className="font-bold text-blue-700">{c.totalAprohal} g</span>{last && last.aprohal > 0 && <p className="text-xs text-gray-400">(utolsó: {last.aprohal}g)</p>}</div>}
+                              {isEdit ? <input type="number" value={nagyhalaInput} onChange={(e) => setNagyhalaInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center" />
+                                : <span className="font-bold text-green-700">{c.totalNagyhal} g</span>}
                             </td>
                             <td className="px-2 py-2 text-center">
-                              {isEdit ? <input type="number" step="1" value={darabszamInput} onChange={(e) => setDarabszamInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center text-sm" />
-                                : <div><span className="font-bold text-purple-700">{c.totalDarabszam} db</span>{last && last.darabszam > 0 && <p className="text-xs text-gray-400">(utolsó: {last.darabszam})</p>}</div>}
+                              {isEdit ? <input type="number" value={aprohalaInput} onChange={(e) => setAprohalaInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center" />
+                                : <span className="font-bold text-blue-700">{c.totalAprohal} g</span>}
                             </td>
-                            <td className="px-2 py-2 text-center"><span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold text-sm">{c.mindosszesen} g</span></td>
-                            <td className="px-2 py-2 text-center"><span className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold text-sm">{c.totalDarabszam} db</span></td>
+                            <td className="px-2 py-2 text-center">
+                              {isEdit ? <input type="number" value={darabszamInput} onChange={(e) => setDarabszamInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center" />
+                                : <span className="font-bold text-purple-700">{c.totalDarabszam}</span>}
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              <span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{c.mindosszesen} g</span>
+                            </td>
                             <td className="px-2 py-2 text-center">
                               {isEdit
                                 ? <div className="flex gap-1 justify-center">
-                                    <button onClick={() => addMeasurement(c.id)} className="px-2 py-0.5 bg-green-600 text-white rounded text-xs font-semibold">Ment</button>
-                                    <button onClick={() => { setEditingId(null); setNagyhalaInput(''); setAprohalaInput(''); setDarabszamInput(''); }} className="px-2 py-0.5 bg-gray-400 text-white rounded text-xs font-semibold">Nem</button>
+                                    <button onClick={() => addMeasurement(c.id)} className="px-2 py-0.5 bg-green-600 text-white rounded text-xs">Ment</button>
+                                    <button onClick={() => { setEditingId(null); setNagyhalaInput(''); setAprohalaInput(''); setDarabszamInput(''); }} className="px-2 py-0.5 bg-gray-400 text-white rounded text-xs">✕</button>
                                   </div>
-                                : <button onClick={() => setEditingId(c.id)} className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs font-semibold">Rögzít</button>}
+                                : <button onClick={() => setEditingId(c.id)} className="px-2 py-0.5 bg-blue-600 text-white rounded text-xs">Rögzít</button>}
                             </td>
-                            <td className="px-2 py-2 text-center"><button onClick={() => confirmDeleteCompetitor(c.id, c.name)} className="text-red-600 hover:text-red-800"><Trash2 className="w-4 h-4" /></button></td>
+                            <td className="px-2 py-2 text-center">
+                              <button onClick={() => confirmDeleteCompetitor(c.id, c.name)} className="text-red-500 hover:text-red-700"><Trash2 className="w-4 h-4" /></button>
+                            </td>
                           </tr>
                           {isExp && c.measurements.length > 0 && (
-                            <tr><td colSpan={9} className="p-0"><div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
-                              <p className="text-xs font-bold text-gray-500 mb-2 uppercase">Korábbi Mérések</p>
-                              <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
-                                <th className="text-left py-1">#</th><th className="text-left py-1">Időpont</th>
-                                <th className="text-center py-1">Nagyhal (g)</th><th className="text-center py-1">Apróhal (g)</th>
-                                <th className="text-center py-1">Darabszám</th><th className="text-center py-1">Sor összesen</th>
-                                <th className="text-center py-1">Szerk.</th><th className="text-center py-1">Törlés</th>
-                              </tr></thead><tbody>
-                                {c.measurements.map((m, mi) => {
-                                  const isEditM = editingMeasurementId === m.id;
-                                  return (
-                                    <tr key={m.id} className="border-b border-green-100 last:border-b-0">
-                                      <td className="py-1 text-gray-500">{mi + 1}.</td>
-                                      <td className="py-1 text-gray-500">{formatDateTime(m.created_at)}</td>
-                                      <td className="py-1 text-center">{isEditM ? <input type="number" value={editNagyhal} onChange={(e) => setEditNagyhal(e.target.value)} className="w-14 px-1 py-0.5 border border-green-400 rounded text-center" /> : m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : <span className="text-gray-300">-</span>}</td>
-                                      <td className="py-1 text-center">{isEditM ? <input type="number" value={editAprohal} onChange={(e) => setEditAprohal(e.target.value)} className="w-14 px-1 py-0.5 border border-blue-400 rounded text-center" /> : m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : <span className="text-gray-300">-</span>}</td>
-                                      <td className="py-1 text-center">{isEditM ? <input type="number" value={editDarabszam} onChange={(e) => setEditDarabszam(e.target.value)} className="w-14 px-1 py-0.5 border border-purple-400 rounded text-center" /> : m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam} db</span> : <span className="text-gray-300">-</span>}</td>
-                                      <td className="py-1 text-center">{isEditM ? <span className="text-yellow-700 font-bold">{(parseInt(editNagyhal) || 0) + (parseInt(editAprohal) || 0)} g</span> : <span className="text-yellow-700 font-bold">{m.nagyhal + m.aprohal} g</span>}</td>
-                                      <td className="py-1 text-center">
-                                        {isEditM
-                                          ? <div className="flex gap-1 justify-center"><button onClick={() => updateMeasurement(m.id)} className="px-2 py-0.5 bg-green-600 text-white rounded text-xs">Ment</button><button onClick={() => setEditingMeasurementId(null)} className="px-2 py-0.5 bg-gray-400 text-white rounded text-xs">Nem</button></div>
-                                          : <button onClick={() => { setEditingMeasurementId(m.id); setEditNagyhal(m.nagyhal); setEditAprohal(m.aprohal); setEditDarabszam(m.darabszam); }} className="px-2 py-0.5 bg-blue-500 text-white rounded text-xs hover:bg-blue-600">Szerk.</button>}
-                                      </td>
-                                      <td className="py-1 text-center"><button onClick={() => deleteMeasurement(m.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3.5 h-3.5" /></button></td>
-                                    </tr>
-                                  );
-                                })}
-                              </tbody>
-                              <tfoot><tr className="border-t-2 border-green-300 font-bold text-gray-700">
-                                <td colSpan={2} className="py-1">Összesen:</td>
-                                <td className="py-1 text-center text-green-700">{c.totalNagyhal} g</td>
-                                <td className="py-1 text-center text-blue-700">{c.totalAprohal} g</td>
-                                <td className="py-1 text-center text-purple-700">{c.totalDarabszam} db</td>
-                                <td className="py-1 text-center text-yellow-700">{c.mindosszesen} g</td>
-                                <td colSpan={2}></td>
-                              </tr></tfoot>
-                            </table></div></td></tr>
+                            <tr><td colSpan={8} className="p-0">
+                              <div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
+                                <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
+                                  <th className="text-left py-1">#</th><th className="py-1">Időpont</th>
+                                  <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
+                                  <th className="text-center py-1">Db</th><th className="text-center py-1">Összesen</th>
+                                  <th className="text-center py-1">Szerk.</th><th className="text-center py-1">Törl.</th>
+                                </tr></thead><tbody>
+                                  {c.measurements.map((m, mi) => {
+                                    const isEditM = editingMeasurementId === m.id;
+                                    return (
+                                      <tr key={m.id} className="border-b border-green-100">
+                                        <td className="py-1 text-gray-500">{mi + 1}.</td>
+                                        <td className="py-1 text-gray-500">{formatDateTime(m.created_at)}</td>
+                                        <td className="py-1 text-center">{isEditM ? <input type="number" value={editNagyhal} onChange={(e) => setEditNagyhal(e.target.value)} className="w-14 px-1 border border-green-400 rounded text-center" /> : m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : '-'}</td>
+                                        <td className="py-1 text-center">{isEditM ? <input type="number" value={editAprohal} onChange={(e) => setEditAprohal(e.target.value)} className="w-14 px-1 border border-blue-400 rounded text-center" /> : m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : '-'}</td>
+                                        <td className="py-1 text-center">{isEditM ? <input type="number" value={editDarabszam} onChange={(e) => setEditDarabszam(e.target.value)} className="w-14 px-1 border border-purple-400 rounded text-center" /> : m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam}</span> : '-'}</td>
+                                        <td className="py-1 text-center font-bold text-yellow-700">{isEditM ? (parseInt(editNagyhal)||0)+(parseInt(editAprohal)||0) : m.nagyhal + m.aprohal} g</td>
+                                        <td className="py-1 text-center">
+                                          {isEditM
+                                            ? <div className="flex gap-1 justify-center">
+                                                <button onClick={() => updateMeasurement(m.id)} className="px-2 bg-green-600 text-white rounded text-xs">Ment</button>
+                                                <button onClick={() => setEditingMeasurementId(null)} className="px-2 bg-gray-400 text-white rounded text-xs">✕</button>
+                                              </div>
+                                            : <button onClick={() => { setEditingMeasurementId(m.id); setEditNagyhal(m.nagyhal); setEditAprohal(m.aprohal); setEditDarabszam(m.darabszam); }} className="px-2 py-0.5 bg-blue-500 text-white rounded text-xs">Szerk.</button>}
+                                        </td>
+                                        <td className="py-1 text-center">
+                                          <button onClick={() => deleteMeasurement(m.id)} className="text-red-400 hover:text-red-600"><Trash2 className="w-3 h-3" /></button>
+                                        </td>
+                                      </tr>
+                                    );
+                                  })}
+                                </tbody>
+                                <tfoot><tr className="border-t-2 border-green-300 font-bold text-gray-700">
+                                  <td colSpan={2} className="py-1">Összesen:</td>
+                                  <td className="py-1 text-center text-green-700">{c.totalNagyhal} g</td>
+                                  <td className="py-1 text-center text-blue-700">{c.totalAprohal} g</td>
+                                  <td className="py-1 text-center text-purple-700">{c.totalDarabszam}</td>
+                                  <td className="py-1 text-center text-yellow-700">{c.mindosszesen} g</td>
+                                  <td colSpan={2}></td>
+                                </tr></tfoot>
+                              </table>
+                            </div>
+                            </td></tr>
                           )}
                         </React.Fragment>
                       );
                     })}
                   </tbody>
                 </table>
-                {competitors.length === 0 && <div className="text-center py-8 text-gray-400"><Fish className="w-12 h-12 mx-auto mb-3 opacity-50" /><p className="text-sm">Még nincsenek versenyzők.</p></div>}
+                {competitors.length === 0 && <div className="text-center py-8 text-gray-400"><Fish className="w-10 h-10 mx-auto mb-2 opacity-40" /><p className="text-sm">Még nincsenek versenyzők.</p></div>}
               </div>
             </div>
           )}
 
+          {/* Felhasználói tábla */}
           {!user && (
-            <div className="bg-white rounded-lg shadow-lg p-4 mb-4">
-              <h2 className="text-lg font-bold mb-3 text-gray-800">Versenyzők és Fogások</h2>
+            <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
+              <h2 className="text-base font-bold mb-3">Versenyzők Eredményei</h2>
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="bg-gray-100 border-b-2 border-gray-300">
                     <th className="px-2 py-2 text-center">#</th><th className="px-2 py-2 text-left">Név</th>
-                    <th className="px-2 py-2 text-center">Nagyhal (g)</th><th className="px-2 py-2 text-center">Apróhal (g)</th>
-                    <th className="px-2 py-2 text-center">Összesen (g)</th><th className="px-2 py-2 text-center">Darabszám</th>
+                    <th className="px-2 py-2 text-center">Nagyhal</th><th className="px-2 py-2 text-center">Apróhal</th>
+                    <th className="px-2 py-2 text-center">Összesen</th><th className="px-2 py-2 text-center">Db</th>
                   </tr></thead>
                   <tbody>
                     {competitors.map((c, idx) => (
                       <React.Fragment key={c.id}>
-                        <tr className={idx % 2 === 0 ? 'bg-white hover:bg-green-50 cursor-pointer' : 'bg-gray-50 hover:bg-green-50 cursor-pointer'} onClick={() => setEditingId(editingId === c.id ? null : c.id)}>
+                        <tr className={`${idx % 2 === 0 ? 'bg-white' : 'bg-gray-50'} hover:bg-green-50 cursor-pointer`} onClick={() => setEditingId(editingId === c.id ? null : c.id)}>
                           <td className="px-2 py-2 text-center font-bold text-gray-600">{idx + 1}</td>
-                          <td className="px-2 py-2"><div className="flex items-center gap-2"><span className="font-semibold">{c.name}</span>{c.measurements.length > 0 && <span className="text-xs text-blue-600">{editingId === c.id ? '▲' : '▼'}</span>}</div></td>
-                          <td className="px-2 py-2 text-center"><span className="font-bold text-green-700">{c.totalNagyhal} g</span></td>
-                          <td className="px-2 py-2 text-center"><span className="font-bold text-blue-700">{c.totalAprohal} g</span></td>
-                          <td className="px-2 py-2 text-center"><span className="inline-block bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{c.mindosszesen} g</span></td>
-                          <td className="px-2 py-2 text-center"><span className="inline-block bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">{c.totalDarabszam} db</span></td>
+                          <td className="px-2 py-2 font-semibold">{c.name} {c.measurements.length > 0 && <span className="text-xs text-blue-500">{editingId === c.id ? '▲' : '▼'}</span>}</td>
+                          <td className="px-2 py-2 text-center font-bold text-green-700">{c.totalNagyhal} g</td>
+                          <td className="px-2 py-2 text-center font-bold text-blue-700">{c.totalAprohal} g</td>
+                          <td className="px-2 py-2 text-center"><span className="bg-yellow-100 text-yellow-800 px-2 py-0.5 rounded-full font-bold">{c.mindosszesen} g</span></td>
+                          <td className="px-2 py-2 text-center"><span className="bg-purple-100 text-purple-800 px-2 py-0.5 rounded-full font-bold">{c.totalDarabszam} db</span></td>
                         </tr>
                         {editingId === c.id && c.measurements.length > 0 && (
-                          <tr><td colSpan={6} className="p-0"><div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
-                            <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
-                              <th className="text-left py-1">#</th><th className="text-left py-1">Időpont</th>
-                              <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
-                              <th className="text-center py-1">Darab</th><th className="text-center py-1">Sor összesen</th>
-                            </tr></thead><tbody>
-                              {c.measurements.map((m, mi) => (
-                                <tr key={m.id} className="border-b border-green-100 last:border-b-0">
-                                  <td className="py-1 text-gray-500">{mi + 1}.</td><td className="py-1 text-gray-500">{formatDateTime(m.created_at)}</td>
-                                  <td className="py-1 text-center">{m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : <span className="text-gray-300">-</span>}</td>
-                                  <td className="py-1 text-center">{m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : <span className="text-gray-300">-</span>}</td>
-                                  <td className="py-1 text-center">{m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam} db</span> : <span className="text-gray-300">-</span>}</td>
-                                  <td className="py-1 text-center"><span className="text-yellow-700 font-bold">{m.nagyhal + m.aprohal} g</span></td>
-                                </tr>
-                              ))}
-                            </tbody>
-                            <tfoot><tr className="border-t-2 border-green-300 font-bold text-gray-700">
-                              <td colSpan={2} className="py-1">Összesen:</td>
-                              <td className="py-1 text-center text-green-700">{c.totalNagyhal} g</td>
-                              <td className="py-1 text-center text-blue-700">{c.totalAprohal} g</td>
-                              <td className="py-1 text-center text-purple-700">{c.totalDarabszam} db</td>
-                              <td className="py-1 text-center text-yellow-700">{c.mindosszesen} g</td>
-                            </tr></tfoot>
-                          </table></div></td></tr>
+                          <tr><td colSpan={6} className="p-0">
+                            <div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
+                              <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
+                                <th className="text-left py-1">#</th><th>Időpont</th>
+                                <th className="text-center py-1">Nagyhal</th><th className="text-center py-1">Apróhal</th>
+                                <th className="text-center py-1">Db</th><th className="text-center py-1">Sor össz.</th>
+                              </tr></thead><tbody>
+                                {c.measurements.map((m, mi) => (
+                                  <tr key={m.id} className="border-b border-green-100">
+                                    <td className="py-1 text-gray-500">{mi + 1}.</td>
+                                    <td className="py-1 text-gray-500">{formatDateTime(m.created_at)}</td>
+                                    <td className="py-1 text-center">{m.nagyhal > 0 ? <span className="text-green-700 font-bold">{m.nagyhal} g</span> : '-'}</td>
+                                    <td className="py-1 text-center">{m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : '-'}</td>
+                                    <td className="py-1 text-center">{m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam}</span> : '-'}</td>
+                                    <td className="py-1 text-center font-bold text-yellow-700">{m.nagyhal + m.aprohal} g</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                              <tfoot><tr className="border-t-2 border-green-300 font-bold">
+                                <td colSpan={2} className="py-1">Összesen:</td>
+                                <td className="py-1 text-center text-green-700">{c.totalNagyhal} g</td>
+                                <td className="py-1 text-center text-blue-700">{c.totalAprohal} g</td>
+                                <td className="py-1 text-center text-purple-700">{c.totalDarabszam}</td>
+                                <td className="py-1 text-center text-yellow-700">{c.mindosszesen} g</td>
+                              </tr></tfoot>
+                            </table>
+                          </div>
+                          </td></tr>
                         )}
                       </React.Fragment>
                     ))}
                   </tbody>
                 </table>
-                {competitors.length === 0 && <div className="text-center py-8 text-gray-400"><Fish className="w-12 h-12 mx-auto mb-3 opacity-50" /><p className="text-sm">Még nincsenek versenyzők.</p></div>}
+                {competitors.length === 0 && <div className="text-center py-8 text-gray-400"><Fish className="w-10 h-10 mx-auto mb-2 opacity-40" /><p className="text-sm">Még nincsenek versenyzők.</p></div>}
               </div>
             </div>
           )}
@@ -975,181 +1277,134 @@ export default function FishingCompetition() {
   // NÉZET: FŐOLDAL
   // ══════════════════════════════════════════════════════════════════════
   return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 to-green-50 p-4">
-      <div className="max-w-7xl mx-auto">
+    <div className="min-h-screen bg-gradient-to-br from-slate-100 to-blue-50">
+      {/* Regisztrációs modal */}
+      {registrationModal && (
+        <RegistrationModal
+          competitionId={registrationModal}
+          onClose={() => setRegistrationModal(null)}
+          onSubmit={submitRegistration}
+        />
+      )}
 
-        {showLoginModal && !user && (
-          <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-lg shadow-2xl p-8 w-full max-w-md">
-              <div className="flex justify-between items-center mb-6">
-                <h2 className="text-xl font-bold text-gray-800">Admin Bejelentkezés</h2>
-                <button onClick={() => setShowLoginModal(false)} className="text-gray-500 hover:text-gray-700 text-2xl">✕</button>
+      {/* Login modal */}
+      {showLoginModal && !user && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md">
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-xl font-bold">Admin Bejelentkezés</h2>
+              <button onClick={() => setShowLoginModal(false)} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Email cím</label>
+                <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none" placeholder="admin@example.com" />
               </div>
-              <div className="space-y-4">
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Email cím</label>
-                  <input type="email" value={email} onChange={(e) => setEmail(e.target.value)}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="admin@example.com" />
-                </div>
-                <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Jelszó</label>
-                  <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
-                    onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
-                    className="w-full px-4 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none" placeholder="••••••••" />
-                </div>
-                {loginError && <div className="bg-red-100 border-2 border-red-400 text-red-700 px-3 py-2 rounded-lg text-sm">{loginError}</div>}
-                <button onClick={handleLogin} disabled={loading}
-                  className="w-full bg-green-600 text-white py-2 rounded-lg hover:bg-green-700 font-semibold disabled:bg-gray-400">
-                  {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
-                </button>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-1">Jelszó</label>
+                <input type="password" value={password} onChange={(e) => setPassword(e.target.value)}
+                  onKeyDown={(e) => e.key === 'Enter' && handleLogin()}
+                  className="w-full px-4 py-2 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none" placeholder="••••••••" />
               </div>
+              {loginError && <div className="bg-red-100 border-2 border-red-400 text-red-700 px-3 py-2 rounded-xl text-sm">{loginError}</div>}
+              <button onClick={handleLogin} disabled={loading}
+                className="w-full bg-green-600 text-white py-2 rounded-xl hover:bg-green-700 font-bold disabled:bg-gray-400">
+                {loading ? 'Bejelentkezés...' : 'Bejelentkezés'}
+              </button>
             </div>
           </div>
-        )}
+        </div>
+      )}
 
-        {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-lg shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
+      {showShareToast && <div className="fixed top-4 right-4 z-50 bg-green-600 text-white px-4 py-3 rounded-xl shadow-xl flex items-center gap-2"><CheckCircle className="w-5 h-5" />Link másolva!</div>}
+
+      {/* Hero sáv */}
+      <div className="bg-gradient-to-r from-green-700 to-teal-600 text-white px-4 py-6 shadow-xl">
+        <div className="max-w-4xl mx-auto">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="bg-white bg-opacity-20 rounded-full p-2">
+                <Fish className="w-7 h-7" />
+              </div>
+              <div>
+                <h1 className="text-2xl font-bold">Horgászverseny</h1>
+                <p className="text-green-200 text-xs mt-0.5">Eredmények és versenykiírások</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              <button onClick={handleShare} className="p-2 bg-white bg-opacity-20 rounded-lg hover:bg-opacity-30"><Share2 className="w-4 h-4" /></button>
+              <AuthButton />
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div className="max-w-4xl mx-auto px-4 py-5">
         <DbErrorBanner dbError={dbError} setDbError={setDbError} />
-
-        <div className="bg-gradient-to-r from-green-600 to-blue-600 text-white p-5 rounded-lg shadow-xl mb-4">
-          <div className="flex items-center gap-3"><Fish className="w-8 h-8" /><h1 className="text-3xl font-bold">{mainPageInfo.title || title}</h1></div>
-          <p className="mt-1 text-green-100 text-sm">45 versenyző • Korlátlan mérés{user ? ' • Admin: ' + user.email : ''}</p>
-        </div>
-
-        <div className="flex flex-wrap gap-2 mb-4">
-          <button onClick={() => setView('list')} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><FolderOpen className="w-4 h-4" />Versenyek</button>
-          <button onClick={handleShare} className="px-4 py-2 bg-white text-gray-700 rounded-lg hover:bg-gray-100 text-sm font-semibold flex items-center gap-2 shadow-md"><Share2 className="w-4 h-4" />Megosztás</button>
-          <AuthButton />
-        </div>
 
         {user && renderAdminInfoEditor()}
 
-        {/* Aktív versenyek kártyái */}
-        {activeCompetitions.length > 0 && (
-          <div className="mb-4 space-y-4">
-            {activeCompetitions.map(comp => {
-              const desc = safeField(comp.description);
-              const loc  = safeField(comp.location);
-              const nts  = safeField(comp.notes);
-              const hasInfo = desc || loc || nts;
-              return (
-                <div key={comp.id} className="bg-white rounded-xl shadow-lg border-2 border-green-300 overflow-hidden">
-                  {/* Fejléc */}
-                  <div className="bg-gradient-to-r from-green-500 to-emerald-600 px-5 py-4 flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <Fish className="w-6 h-6 text-white" />
-                      <div>
-                        <h2 className="text-lg font-bold text-white">{safeField(comp.title) || 'Horgászverseny'}</h2>
-                        <span className="inline-block bg-green-400 bg-opacity-50 text-white text-xs font-bold px-2 py-0.5 rounded-full mt-0.5">🟢 Aktív verseny</span>
-                      </div>
-                    </div>
-                    <button
-                      onClick={() => loadCompetition(comp.id)}
-                      className="px-4 py-2 bg-white text-green-700 rounded-lg font-bold text-sm hover:bg-green-50 shadow flex items-center gap-2 flex-shrink-0">
-                      <Trophy className="w-4 h-4" />Eredmények
-                    </button>
-                  </div>
-
-                  {/* Kiírás tartalma */}
-                  {hasInfo ? (
-                    <div className="p-5 space-y-4">
-                      {desc && (
-                        <div>
-                          <h3 className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📋 Verseny kiírás</h3>
-                          <p className="text-gray-700 text-sm whitespace-pre-wrap">{desc}</p>
-                        </div>
-                      )}
-                      {loc && (
-                        <div>
-                          <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">📍 Helyszín</h3>
-                          <p className="text-gray-700 text-sm">{loc}</p>
-                        </div>
-                      )}
-                      {nts && (
-                        <div>
-                          <h3 className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-1">⚠️ Fontos tudnivalók</h3>
-                          <p className="text-gray-700 text-sm whitespace-pre-wrap">{nts}</p>
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <div className="px-5 py-4 text-sm text-gray-400 italic">
-                      {user ? '👆 Kattints a "Verseny Információk" gombra a kiírás hozzáadásához.' : 'A verseny kiírása hamarosan megjelenik.'}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
+        {/* Admin: Új verseny gomb */}
+        {user && (
+          <div className="flex gap-2 mb-4">
+            <button onClick={() => setView('list')} className="flex-1 py-2.5 bg-white border-2 border-gray-200 text-gray-700 rounded-xl font-semibold text-sm flex items-center justify-center gap-2 hover:border-gray-300 shadow-sm">
+              <FolderOpen className="w-4 h-4" />Versenyek kezelése
+            </button>
+            <button onClick={createNewCompetition} className="flex-1 py-2.5 bg-green-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:bg-green-700 shadow">
+              <Plus className="w-4 h-4" />Új verseny
+            </button>
           </div>
         )}
 
-        {/* Archív versenyek kiírásai — csak ha van tartalmuk */}
-        {archivedList.filter(c => safeField(c.description) || safeField(c.location) || safeField(c.notes)).length > 0 && (
-          <div className="mb-4">
-            <h3 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
-              <Archive className="w-4 h-4" />Korábbi versenyek kiírásai
-            </h3>
-            <div className="space-y-3">
-              {archivedList.filter(c => safeField(c.description) || safeField(c.location) || safeField(c.notes)).map(comp => {
-                const desc = safeField(comp.description);
-                const loc  = safeField(comp.location);
-                const nts  = safeField(comp.notes);
-                const isOpen = expandedAdminId === comp.id;
-                return (
-                  <div key={comp.id} className="bg-white rounded-xl shadow border-2 border-gray-200 overflow-hidden">
-                    <button
-                      onClick={() => setExpandedAdminId(isOpen ? null : comp.id)}
-                      className="w-full px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition-colors">
-                      <div className="flex items-center gap-3">
-                        <Archive className="w-5 h-5 text-gray-400" />
-                        <div className="text-left">
-                          <p className="font-bold text-gray-700">{safeField(comp.title) || 'Horgászverseny'}</p>
-                          <p className="text-xs text-gray-400">{formatDate(comp.created_at)} • Lezárt verseny</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <span className="text-xs text-gray-400 font-semibold">{isOpen ? 'Bezár ▲' : 'Kiírás megtekintése ▼'}</span>
-                      </div>
-                    </button>
-                    {isOpen && (
-                      <div className="px-5 pb-5 border-t border-gray-100 pt-4 space-y-3">
-                        {desc && (
-                          <div>
-                            <h3 className="text-xs font-bold text-green-700 uppercase tracking-wide mb-1">📋 Verseny kiírás</h3>
-                            <p className="text-gray-700 text-sm whitespace-pre-wrap">{desc}</p>
-                          </div>
-                        )}
-                        {loc && (
-                          <div>
-                            <h3 className="text-xs font-bold text-blue-700 uppercase tracking-wide mb-1">📍 Helyszín</h3>
-                            <p className="text-gray-700 text-sm">{loc}</p>
-                          </div>
-                        )}
-                        {nts && (
-                          <div>
-                            <h3 className="text-xs font-bold text-orange-700 uppercase tracking-wide mb-1">⚠️ Fontos tudnivalók</h3>
-                            <p className="text-gray-700 text-sm whitespace-pre-wrap">{nts}</p>
-                          </div>
-                        )}
-                        <button onClick={() => loadArchivedCompetition(comp.id)} className="mt-2 px-4 py-2 bg-gray-600 text-white rounded-lg text-sm font-semibold hover:bg-gray-700 flex items-center gap-2">
-                          <Trophy className="w-4 h-4" />Eredmények megtekintése
-                        </button>
-                      </div>
-                    )}
-                  </div>
-                );
-              })}
+        {/* Aktív versenyek csoportosítva */}
+        {groupedCompetitions.active.length > 0 && (
+          <div className="mb-2">
+            <div className="flex items-center gap-2 mb-3">
+              <span className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
+              <h2 className="text-sm font-bold text-gray-600 uppercase tracking-wide">Aktuális versenyek</h2>
             </div>
+            {groupedCompetitions.active.map((group, gi) => (
+              <EventCard
+                key={gi}
+                eventName={group.name}
+                competitions={group.comps}
+                onOpenCompetition={loadCompetition}
+                onOpenArchived={loadArchivedCompetition}
+                isArchived={false}
+                user={user}
+                onRegister={handleRegistration}
+              />
+            ))}
           </div>
         )}
 
-        {/* Ha nincs egy verseny sem */}
+        {/* Korábbi versenyek csoportosítva */}
+        {groupedCompetitions.archived.length > 0 && (
+          <div>
+            <div className="flex items-center gap-2 mb-3 mt-2">
+              <Archive className="w-4 h-4 text-gray-400" />
+              <h2 className="text-sm font-bold text-gray-500 uppercase tracking-wide">Korábbi versenyek</h2>
+            </div>
+            {groupedCompetitions.archived.map((group, gi) => (
+              <EventCard
+                key={gi}
+                eventName={group.name}
+                competitions={group.comps}
+                onOpenCompetition={loadCompetition}
+                onOpenArchived={loadArchivedCompetition}
+                isArchived={true}
+                user={user}
+                onRegister={handleRegistration}
+              />
+            ))}
+          </div>
+        )}
+
         {competitions.length === 0 && (
-          <div className="bg-white rounded-lg shadow-lg p-8 mb-4 text-center">
-            <Fish className="w-16 h-16 mx-auto mb-4 text-blue-300 opacity-60" />
-            <p className="text-gray-500 text-sm">Még nincs verseny. {user ? 'Hozz létre egyet a Versenyek menüben!' : 'Hamarosan indul a következő verseny.'}</p>
-            {user && <button onClick={() => setView('list')} className="mt-4 px-6 py-3 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold flex items-center gap-2 mx-auto">
-              <Plus className="w-5 h-5" />Verseny létrehozása
-            </button>}
+          <div className="bg-white rounded-2xl shadow p-10 text-center">
+            <Fish className="w-14 h-14 mx-auto mb-4 text-green-300" />
+            <p className="text-gray-500">Hamarosan indul a következő verseny!</p>
           </div>
         )}
 
