@@ -313,31 +313,18 @@ const EventCard = ({ eventName, competitions, onOpenCompetition, onOpenArchived,
               )}
             </div>
 
-            {/* ── Eredmény gombok szektoronként — mindig látható ── */}
-            {(() => {
-              const visibleComps = competitions;
-              return (
-                <div>
-                  <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-                    <Trophy className="w-3 h-3" />Eredmények
-                  </h3>
-                  <div className={`grid gap-2 ${visibleComps.length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
-                    {visibleComps.map(c => {
-                      const col = sectorColor(c.title);
-                      return (
-                        <button
-                          key={c.id}
-                          onClick={() => isArchived ? onOpenArchived(c.id) : onOpenCompetition(c.id)}
-                          className={`py-2 rounded-xl text-sm font-bold flex items-center justify-center gap-2 transition-colors ${isArchived ? 'bg-gray-100 text-gray-700 hover:bg-gray-200' : `${col.badge} text-white hover:opacity-90`}`}>
-                          <Trophy className="w-4 h-4" />
-                          {hasMultipleSectors ? `${col.text} szektor` : 'Eredmények'}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              );
-            })()}
+            {/* Eredmények link a Versenyek menübe */}
+            <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
+              <span className="text-xs text-gray-400">
+                {isArchived ? 'Lezárt verseny' : hasMultipleSectors ? `${competitions.length} szektor · sorsolás helyszínen` : 'Eredmények a Versenyek menüben'}
+              </span>
+              <button
+                onClick={() => onOpenCompetition('list')}
+                className="text-xs font-bold text-green-700 hover:text-green-900 flex items-center gap-1 transition-colors">
+                <Trophy className="w-3 h-3" />
+                {isArchived ? 'Archív eredmények' : 'Verseny eredmények'} →
+              </button>
+            </div>
           </div>
         </div>
       )}
@@ -1403,7 +1390,7 @@ export default function FishingCompetition() {
                 key={gi}
                 eventName={group.name}
                 competitions={group.comps}
-                onOpenCompetition={loadCompetition}
+                onOpenCompetition={(id) => id === 'list' ? setView('list') : loadCompetition(id)}
                 onOpenArchived={loadArchivedCompetition}
                 isArchived={false}
                 user={user}
@@ -1425,7 +1412,7 @@ export default function FishingCompetition() {
                 key={gi}
                 eventName={group.name}
                 competitions={group.comps}
-                onOpenCompetition={loadCompetition}
+                onOpenCompetition={(id) => id === 'list' ? setView('list') : loadCompetition(id)}
                 onOpenArchived={loadArchivedCompetition}
                 isArchived={true}
                 user={user}
