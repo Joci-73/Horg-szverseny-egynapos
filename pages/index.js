@@ -139,81 +139,60 @@ const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
 );
 
 // ── Versenyesemény kártya a főoldalon ─────────────────────────────────
-// Egy "esemény" = egy csoport (pl. 2026.02.28) vagy önálló verseny
-// EGY kiírás, EGY közös jelentkezési lista, szektoronként eredmény gomb
-const EventCard = ({ eventName, competitions, onOpenCompetition, onOpenArchived, isArchived, user, onRegister }) => {
-  const [expanded, setExpanded] = useState(!isArchived); // aktív kártyák alapból nyitva
-  const hasMultipleSectors = competitions.length > 1;
+// Egy esemény = egy kiírás kártya. Ha több szektor van (event_group),
+// egyetlen kártyán jelenik meg — szektorokról itt szó sincs.
+const EventCard = ({ eventName, competitions, onGoToResults, isArchived, user, onRegister }) => {
+  const [expanded, setExpanded] = useState(true);
 
-  // Elsődleges verseny: amelyiknek van leírása, vagy az első
-  const primary = competitions.find(c => safeField(c.description) || safeField(c.location) || safeField(c.notes) || safeField(c.image_url))
-    || competitions[0];
+  // Az elsődleges adatokat abból a versenyből vesszük, amelyikben van kiírás
+  const primary = competitions.find(c =>
+    safeField(c.description) || safeField(c.location) || safeField(c.notes) || safeField(c.image_url)
+  ) || competitions[0];
 
-  const desc   = safeField(primary?.description);
-  const loc    = safeField(primary?.location);
-  const nts    = safeField(primary?.notes);
-  const imgUrl = safeField(primary?.image_url);
-  const eventDate = safeField(primary?.event_date) || safeField(competitions[0]?.event_date);
+  const desc     = safeField(primary?.description);
+  const loc      = safeField(primary?.location);
+  const nts      = safeField(primary?.notes);
+  const imgUrl   = safeField(primary?.image_url);
+  const evDate   = safeField(primary?.event_date) || safeField(competitions[0]?.event_date);
 
-  // Közös jelentkezési lista: minden szektor regisztrációját összegyűjti
-  const allRegs = competitions.flatMap(c => (c.registrations || []).map(r => ({ ...r, _compId: c.id })));
-  // Duplikátum szűrés id alapján
-  const uniqueRegs = allRegs.filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i);
+  // Közös jelentkezési lista az összes szektorból összegyűjtve
+  const allRegs = competitions
+    .flatMap(c => (c.registrations || []).map(r => ({ ...r, _compId: c.id })))
+    .filter((r, i, arr) => arr.findIndex(x => x.id === r.id) === i);
 
-  // Regisztrációs cél: mindig az elsődleges versenybe megy
   const registrationTargetId = primary?.id;
 
-  // Szektorok: csak azok ahol már van versenyző felvíve
-
   return (
-    <div className={`rounded-2xl shadow-lg overflow-hidden mb-5 border-2 ${isArchived ? 'border-gray-200' : 'border-green-300'}`}>
+    <div className={`rounded-2xl shadow-md overflow-hidden mb-4 border-2 ${isArchived ? 'border-gray-200' : 'border-green-300'}`}>
 
-      {/* Fejléc — kattintható */}
+      {/* Fejléc */}
       <div
-        className={`px-5 py-4 cursor-pointer ${isArchived
-          ? 'bg-gradient-to-r from-gray-500 to-gray-600'
+        className={`px-5 py-4 cursor-pointer select-none ${isArchived
+          ? 'bg-gradient-to-r from-gray-500 to-gray-700'
           : 'bg-gradient-to-r from-green-600 to-teal-600'} text-white`}
         onClick={() => setExpanded(!expanded)}>
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-3 min-w-0">
             <div className="flex-shrink-0">
               {isArchived
-                ? <Archive className="w-5 h-5 text-gray-300" />
+                ? <Archive className="w-5 h-5 opacity-70" />
                 : <span className="block w-3 h-3 rounded-full bg-green-300 animate-pulse" />}
             </div>
             <div className="min-w-0">
-              <div className="flex items-center gap-2 flex-wrap">
-                <span className="text-xs font-bold uppercase tracking-wider opacity-75">
-                  {isArchived ? 'Korábbi verseny' : 'Aktuális verseny'}
-                </span>
-                {eventDate && (
-                  <span className="text-xs opacity-75 flex items-center gap-1">
-                    <Calendar className="w-3 h-3" />{eventDate}
-                  </span>
-                )}
-              </div>
-              <h2 className="text-lg font-bold leading-snug">{eventName}</h2>
-              {hasMultipleSectors && (
-                <div className="flex gap-1 mt-1">
-                  {competitions.map(c => {
-                    const col = sectorColor(c.title);
-                    return (
-                      <span key={c.id} className={`${col.badge} text-white text-xs font-bold px-2 py-0.5 rounded-full opacity-90`}>
-                        {col.text} szektor
-                      </span>
-                    );
-                  })}
-                </div>
-              )}
+              <span className="text-xs font-bold uppercase tracking-wider opacity-70">
+                {isArchived ? 'Korábbi verseny' : 'Aktuális verseny'}
+                {evDate ? ` · ${evDate}` : ''}
+              </span>
+              <h2 className="text-lg font-bold leading-snug truncate">{eventName}</h2>
             </div>
           </div>
           <div className="flex items-center gap-2 flex-shrink-0">
-            {uniqueRegs.length > 0 && (
+            {allRegs.length > 0 && (
               <span className="text-xs bg-white bg-opacity-25 font-bold px-2 py-1 rounded-full">
-                {uniqueRegs.length} csapat
+                {allRegs.length} jelentkező
               </span>
             )}
-            {expanded ? <ChevronUp className="w-5 h-5 opacity-75" /> : <ChevronDown className="w-5 h-5 opacity-75" />}
+            {expanded ? <ChevronUp className="w-5 h-5 opacity-70" /> : <ChevronDown className="w-5 h-5 opacity-70" />}
           </div>
         </div>
       </div>
@@ -223,21 +202,22 @@ const EventCard = ({ eventName, competitions, onOpenCompetition, onOpenArchived,
         <div className="bg-white">
           {/* Kép */}
           {imgUrl && (
-            <div className="overflow-hidden">
-              <img src={imgUrl} alt="Verseny" className="w-full object-cover max-h-72"
+            <div className="overflow-hidden max-h-72">
+              <img src={imgUrl} alt="Verseny" className="w-full object-cover"
                 onError={(e) => { e.target.parentElement.style.display = 'none'; }} />
             </div>
           )}
 
           <div className="px-5 py-4 space-y-4">
-            {/* Kiírás */}
+
+            {/* Kiírás szövege */}
             {(desc || loc || nts) ? (
               <div className="space-y-3">
                 {desc && (
                   <div>
-                    <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-1.5 flex items-center gap-1">
                       <ClipboardList className="w-3 h-3" />Verseny kiírás
-                    </h3>
+                    </p>
                     <p className="text-gray-700 text-sm whitespace-pre-wrap leading-relaxed">{desc}</p>
                   </div>
                 )}
@@ -254,84 +234,73 @@ const EventCard = ({ eventName, competitions, onOpenCompetition, onOpenArchived,
                   </div>
                 )}
               </div>
-            ) : !isArchived && (
-              <p className="text-sm text-gray-400 italic text-center py-2">A verseny kiírása hamarosan megjelenik.</p>
+            ) : (
+              <p className="text-sm text-gray-400 italic text-center py-2">
+                {isArchived ? '' : 'A verseny kiírása hamarosan megjelenik.'}
+              </p>
             )}
 
-            {/* Sorsolásra vonatkozó megjegyzés ha több szektor van */}
-            {hasMultipleSectors && !isArchived && (
-              <div className="bg-blue-50 border border-blue-200 rounded-xl p-3 flex items-start gap-2">
-                <span className="text-lg flex-shrink-0">🎲</span>
-                <p className="text-xs text-blue-700">
-                  <strong>Szektorok sorsolása a helyszínen történik.</strong> A szektort a verseny napján sorsolják ki — ez nem befolyásolja a jelentkezést.
+            {/* Jelentkezők listája */}
+            {(allRegs.length > 0 || !isArchived) && (
+              <div>
+                <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
+                  <Users className="w-3 h-3" />
+                  Jelentkezők
+                  {allRegs.length > 0 && (
+                    <span className="ml-1 bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full">
+                      {allRegs.length}
+                    </span>
+                  )}
                 </p>
+
+                {allRegs.length > 0 ? (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {allRegs.map((r) => (
+                      <div key={r.id} className="flex items-center gap-1.5 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5">
+                        <span className="text-sm font-semibold text-blue-800">{r.team_name}</span>
+                        {user && (
+                          <button
+                            onClick={() => onRegister('delete', r._compId, r.id)}
+                            className="text-red-300 hover:text-red-600 ml-0.5 transition-colors"
+                            title="Törlés">
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="text-xs text-gray-400 mb-3 italic">
+                    Még nincs jelentkező — légy az első!
+                  </p>
+                )}
+
+                {/* Jelentkezés gomb */}
+                {!isArchived && (
+                  <button
+                    onClick={() => onRegister('open', registrationTargetId, null)}
+                    className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-2 transition-colors shadow-sm">
+                    <Plus className="w-4 h-4" />Jelentkezés versenyre
+                  </button>
+                )}
               </div>
             )}
 
-            {/* ── Jelentkezett csapatok ── */}
-            <div>
-              <h3 className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2 flex items-center gap-1">
-                <Users className="w-3 h-3" />
-                Jelentkezett csapatok
-                {uniqueRegs.length > 0 && (
-                  <span className="ml-1 bg-blue-100 text-blue-700 font-bold px-1.5 py-0.5 rounded-full text-xs">
-                    {uniqueRegs.length}
-                  </span>
-                )}
-              </h3>
-
-              {uniqueRegs.length > 0 ? (
-                <div className="flex flex-wrap gap-2 mb-3">
-                  {uniqueRegs.map((r) => (
-                    <div key={r.id} className="flex items-center gap-1 bg-blue-50 border border-blue-200 rounded-full px-3 py-1.5">
-                      <span className="text-sm">🎣</span>
-                      <span className="text-sm font-semibold text-blue-800">{r.team_name}</span>
-                      {user && (
-                        <button
-                          onClick={() => onRegister('delete', r._compId, r.id)}
-                          className="text-red-300 hover:text-red-600 ml-1 transition-colors"
-                          title="Csapat törlése">
-                          <X className="w-3 h-3" />
-                        </button>
-                      )}
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                <p className="text-xs text-gray-400 mb-3 italic">
-                  {isArchived ? 'Nem volt elérhető online jelentkezés.' : 'Még nincs jelentkező csapat — légy az első!'}
-                </p>
-              )}
-
-              {/* Jelentkezés gomb */}
-              {!isArchived && (
-                <button
-                  onClick={() => onRegister('open', registrationTargetId, null)}
-                  className="w-full py-2.5 bg-blue-600 text-white rounded-xl text-sm font-bold hover:bg-blue-700 active:bg-blue-800 flex items-center justify-center gap-2 transition-colors shadow-sm">
-                  <Plus className="w-4 h-4" />Csapat jelentkezése
-                </button>
-              )}
-            </div>
-
-            {/* Eredmények link a Versenyek menübe */}
-            <div className="border-t border-gray-100 pt-3 flex items-center justify-between">
-              <span className="text-xs text-gray-400">
-                {isArchived ? 'Lezárt verseny' : hasMultipleSectors ? `${competitions.length} szektor · sorsolás helyszínen` : 'Eredmények a Versenyek menüben'}
-              </span>
+            {/* Link az eredményekhez */}
+            <div className="border-t border-gray-100 pt-3 flex justify-end">
               <button
-                onClick={() => onOpenCompetition('list')}
-                className="text-xs font-bold text-green-700 hover:text-green-900 flex items-center gap-1 transition-colors">
-                <Trophy className="w-3 h-3" />
-                {isArchived ? 'Archív eredmények' : 'Verseny eredmények'} →
+                onClick={onGoToResults}
+                className="text-xs font-bold text-gray-400 hover:text-green-700 flex items-center gap-1 transition-colors">
+                <Trophy className="w-3 h-3" />Verseny eredmények →
               </button>
             </div>
+
           </div>
         </div>
       )}
     </div>
   );
 };
-
 // ── REGISZTRÁCIÓS MODAL ───────────────────────────────────────────────
 const RegistrationModal = ({ competitionId, onClose, onSubmit }) => {
   const [teamName, setTeamName] = useState('');
@@ -355,17 +324,17 @@ const RegistrationModal = ({ competitionId, onClose, onSubmit }) => {
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Fish className="w-5 h-5 text-blue-600" />Csapat Jelentkezése
+            <Fish className="w-5 h-5 text-blue-600" />Jelentkezés versenyre
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
-        <p className="text-sm text-gray-500 mb-4">A csapatnév megjelenik a verseny kiírásában a többi jelentkező között.</p>
+        <p className="text-sm text-gray-500 mb-4">A neved megjelenik a verseny kiírásában a többi jelentkező között.</p>
         <input
           type="text"
           value={teamName}
           onChange={(e) => setTeamName(e.target.value)}
           onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="Csapat neve pl.: Pontyos Pál"
+          placeholder="pl.: Pontyos Pál"
           className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm mb-2"
           autoFocus
         />
@@ -669,7 +638,7 @@ export default function FishingCompetition() {
     if (action === 'open') {
       setRegistrationModal(compId);
     } else if (action === 'delete') {
-      if (!window.confirm('Biztosan törlöd ezt a csapatot?')) return;
+      if (!window.confirm('Biztosan törlöd ezt a jelentkezőt?')) return;
       try {
         const { error } = await supabase.from('registrations').delete().eq('id', regId);
         if (error) throw error;
@@ -1390,8 +1359,7 @@ export default function FishingCompetition() {
                 key={gi}
                 eventName={group.name}
                 competitions={group.comps}
-                onOpenCompetition={(id) => id === 'list' ? setView('list') : loadCompetition(id)}
-                onOpenArchived={loadArchivedCompetition}
+                onGoToResults={() => setView('list')}
                 isArchived={false}
                 user={user}
                 onRegister={handleRegistration}
@@ -1412,8 +1380,7 @@ export default function FishingCompetition() {
                 key={gi}
                 eventName={group.name}
                 competitions={group.comps}
-                onOpenCompetition={(id) => id === 'list' ? setView('list') : loadCompetition(id)}
-                onOpenArchived={loadArchivedCompetition}
+                onGoToResults={() => setView('list')}
                 isArchived={true}
                 user={user}
                 onRegister={handleRegistration}
