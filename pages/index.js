@@ -735,16 +735,22 @@ export default function FishingCompetition() {
     return { top3Nagyhal, top6Mindosszesen };
   }, [archivedCompetitors]);
 
-  // Versenyeket csoportosítja event_group szerint (vagy title+date alapján)
+  // Versenyeket csoportosítja event_group szerint (fallback: event_date)
   const groupedCompetitions = useMemo(() => {
     const active = competitions.filter(c => !c.archived);
     const archived = competitions.filter(c => c.archived);
 
+    const normalize = (s) => safeField(s).toLowerCase().replace(/\s+/g, ' ').trim();
+
     const groupBy = (list) => {
       const groups = {};
       list.forEach(c => {
-        const key = safeField(c.event_group) || c.id; // ha nincs csoport, önmaga a kulcs
-        if (!groups[key]) groups[key] = { name: safeField(c.event_group) || safeField(c.title) || 'Horgászverseny', comps: [] };
+        const grp   = normalize(c.event_group);
+        const dated = normalize(c.event_date);
+        // Kulcs: event_group ha van, különben event_date ha van, különben saját id
+        const key   = grp || dated || c.id;
+        const name  = safeField(c.event_group) || safeField(c.event_date) || safeField(c.title) || 'Horgászverseny';
+        if (!groups[key]) groups[key] = { name, comps: [] };
         groups[key].comps.push(c);
       });
       return Object.values(groups);
