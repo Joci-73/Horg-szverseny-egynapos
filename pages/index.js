@@ -203,7 +203,7 @@ const EventCard = ({ eventName, competitions, onGoToResults, isArchived, user, o
           {/* Kép */}
           {imgUrl && (
             <div className="overflow-hidden">
-              <img src={imgUrl} alt="Verseny" className="w-full object-contain bg-gray-50"
+              <img src={imgUrl} alt="Verseny" className="w-full object-cover max-h-56 rounded-none"
                 onError={(e) => { e.target.parentElement.style.display = 'none'; }} />
             </div>
           )}
@@ -858,7 +858,7 @@ export default function FishingCompetition() {
             </label>
             {imageUrl ? (
               <div className="relative rounded-xl overflow-hidden border-2 border-gray-200">
-                <img src={imageUrl} alt="Verseny kép" className="w-full object-contain bg-gray-50 max-h-64"
+                <img src={imageUrl} alt="Verseny kép" className="w-full object-cover max-h-48"
                   onError={(e) => { e.target.parentElement.style.display = 'none'; }} />
                 <button
                   onClick={() => { setImageUrl(''); saveFieldToDb('image_url', ''); }}
@@ -973,7 +973,7 @@ export default function FishingCompetition() {
 
           {safeField(archivedCompetition.image_url) && (
             <div className="mb-4 rounded-xl overflow-hidden shadow-lg">
-              <img src={archivedCompetition.image_url} alt="Verseny" className="w-full object-contain bg-gray-50" />
+              <img src={archivedCompetition.image_url} alt="Verseny" className="w-full object-cover max-h-56" />
             </div>
           )}
 
