@@ -388,6 +388,7 @@ export default function FishingCompetition() {
   const [location, setLocation] = useState('');
   const [notes, setNotes] = useState('');
   const [imageUrl, setImageUrl] = useState('');
+  const [imageUploading, setImageUploading] = useState(false);
   const [eventGroup, setEventGroup] = useState('');
   const [eventDate, setEventDate] = useState('');
   const [showCompetitionInfo, setShowCompetitionInfo] = useState(false);
@@ -853,17 +854,68 @@ export default function FishingCompetition() {
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-600 mb-1 flex items-center gap-1">
-              <ImageIcon className="w-3 h-3" />Kép URL-je <span className="text-gray-400 font-normal">(halastó fotója, kiírás képe)</span>
+              <ImageIcon className="w-3 h-3" />Verseny képe
             </label>
-            <input type="text" value={imageUrl}
-              onChange={(e) => handleInfoChange('image_url', e.target.value, setImageUrl)}
-              onBlur={(e) => handleInfoBlur('image_url', e.target.value)}
-              placeholder="https://... (kép linkje)"
-              className="w-full px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none" />
-            {imageUrl && (
-              <div className="mt-2 rounded-lg overflow-hidden border border-gray-200">
-                <img src={imageUrl} alt="Előnézet" className="w-full max-h-40 object-cover" onError={(e) => { e.target.style.display = 'none'; }} />
+            {imageUrl ? (
+              <div className="relative rounded-xl overflow-hidden border-2 border-gray-200">
+                <img src={imageUrl} alt="Verseny kép" className="w-full max-h-48 object-cover"
+                  onError={(e) => { e.target.parentElement.style.display = 'none'; }} />
+                <button
+                  onClick={() => { setImageUrl(''); saveFieldToDb('image_url', ''); }}
+                  className="absolute top-2 right-2 bg-red-600 text-white rounded-full p-1.5 shadow-lg hover:bg-red-700">
+                  <X className="w-4 h-4" />
+                </button>
               </div>
+            ) : (
+              <label className={`flex flex-col items-center justify-center w-full h-32 border-2 border-dashed rounded-xl cursor-pointer transition-colors ${imageUploading ? 'border-blue-300 bg-blue-50' : 'border-gray-300 bg-gray-50 hover:bg-gray-100 hover:border-gray-400'}`}>
+                <div className="flex flex-col items-center gap-2 pointer-events-none">
+                  {imageUploading ? (
+                    <>
+                      <RefreshCw className="w-6 h-6 text-blue-500 animate-spin" />
+                      <span className="text-xs text-blue-600 font-semibold">Feltöltés folyamatban...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Camera className="w-6 h-6 text-gray-400" />
+                      <span className="text-xs text-gray-600 font-semibold">Kattints a kép feltöltéséhez</span>
+                      <span className="text-xs text-gray-400">JPG, PNG, WebP · max 5 MB</span>
+                    </>
+                  )}
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  disabled={imageUploading}
+                  onChange={async (e) => {
+                    const file = e.target.files?.[0];
+                    if (!file) return;
+                    if (file.size > 5 * 1024 * 1024) { alert('A kép túl nagy, maximum 5 MB!'); return; }
+                    const cid = competitionIdRef.current;
+                    if (!cid) { alert('Nincs aktív verseny kiválasztva!'); return; }
+                    setImageUploading(true);
+                    try {
+                      const ext = file.name.split('.').pop().toLowerCase();
+                      const path = cid + '/' + Date.now() + '.' + ext;
+                      const { error: upErr } = await supabase.storage
+                        .from('verseny-kepek')
+                        .upload(path, file, { upsert: true });
+                      if (upErr) throw upErr;
+                      const { data: urlData } = supabase.storage
+                        .from('verseny-kepek')
+                        .getPublicUrl(path);
+                      const publicUrl = urlData.publicUrl;
+                      setImageUrl(publicUrl);
+                      await saveFieldToDb('image_url', publicUrl);
+                    } catch (err) {
+                      alert('Feltöltési hiba: ' + err.message);
+                    } finally {
+                      setImageUploading(false);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+              </label>
             )}
           </div>
           <p className="text-xs text-gray-400 italic">💡 Mező elhagyásakor automatikusan ment.</p>
