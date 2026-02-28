@@ -142,7 +142,7 @@ const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
 // Egy esemény = egy kiírás kártya. Ha több szektor van (event_group),
 // egyetlen kártyán jelenik meg — szektorokról itt szó sincs.
 const EventCard = ({ eventName, competitions, onGoToResults, isArchived, user, onRegister }) => {
-  const [expanded, setExpanded] = useState(true);
+  const [expanded, setExpanded] = useState(false);
 
   // Az elsődleges adatokat abból a versenyből vesszük, amelyikben van kiírás
   const primary = competitions.find(c =>
@@ -287,11 +287,11 @@ const EventCard = ({ eventName, competitions, onGoToResults, isArchived, user, o
             )}
 
             {/* Link az eredményekhez */}
-            <div className="border-t border-gray-100 pt-3 flex justify-end">
+            <div className="border-t border-gray-100 pt-3">
               <button
                 onClick={onGoToResults}
-                className="text-xs font-bold text-gray-400 hover:text-green-700 flex items-center gap-1 transition-colors">
-                <Trophy className="w-3 h-3" />Verseny eredmények →
+                className="w-full py-2.5 bg-gradient-to-r from-green-600 to-teal-600 text-white rounded-xl font-bold text-sm flex items-center justify-center gap-2 hover:opacity-90 transition-opacity shadow-sm">
+                <Trophy className="w-4 h-4" />Verseny eredmények megtekintése →
               </button>
             </div>
 
@@ -365,6 +365,10 @@ export default function FishingCompetition() {
   const [title, setTitle] = useState('Horgászverseny');
   const [competitors, setCompetitors] = useState([]);
   const [newName, setNewName] = useState('');
+  const [newRajtszam, setNewRajtszam] = useState('');
+  const [newSzektor, setNewSzektor] = useState('');
+  const [newRajtszam, setNewRajtszam] = useState('');
+  const [newSzektor, setNewSzektor] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [nagyhalaInput, setNagyhalaInput] = useState('');
   const [aprohalaInput, setAprohalaInput] = useState('');
@@ -655,15 +659,19 @@ export default function FishingCompetition() {
   };
 
   // Versenyzők
-  const addCompetitor = async () => {
-    if (!newName.trim() || competitors.length >= 45 || !competitionId) return;
+  const addCompetitor = async (nameOverride, rajtszamOverride, szektorOverride) => {
+    const name = (nameOverride || newName).trim();
+    const rajtszam = rajtszamOverride !== undefined ? rajtszamOverride : (parseInt(newRajtszam) || null);
+    const szektor = szektorOverride !== undefined ? szektorOverride : (newSzektor || null);
+    if (!name || competitors.length >= 45 || !competitionId) return;
     try {
       const { data, error } = await supabase.from('competitors').insert([{
-        competition_id: competitionId, name: newName.trim(), sort_order: competitors.length + 1
+        competition_id: competitionId, name, sort_order: competitors.length + 1,
+        rajtszam, szektor
       }]).select();
       if (error) throw error;
       setCompetitors(prev => [...prev, { ...data[0], measurements: [], totalNagyhal: 0, totalAprohal: 0, totalDarabszam: 0, mindosszesen: 0, nagyhals: [] }]);
-      setNewName('');
+      setNewName(''); setNewRajtszam(''); setNewSzektor('');
     } catch (err) { alert('Hiba: ' + err.message); }
   };
 
@@ -1129,16 +1137,90 @@ export default function FishingCompetition() {
           {/* Versenyző hozzáadás */}
           {user && (
             <div className="bg-white rounded-xl shadow-lg p-4 mb-4">
-              <h2 className="text-base font-bold mb-3 text-gray-800">Versenyző Hozzáadása</h2>
-              <div className="flex gap-3">
-                <input type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+              <h2 className="text-base font-bold mb-3 text-gray-800 flex items-center justify-between">
+                Versenyző Hozzáadása
+                <span className="text-xs font-normal text-gray-400">{competitors.length}/45</span>
+              </h2>
+
+              {/* Regisztrált nevek listája */}
+              {(() => {
+                const activeComp = competitions.find(c => c.id === competitionId);
+                const regs = activeComp?.registrations || [];
+                const addedNames = new Set(competitors.map(c => c.name.toLowerCase()));
+                const remaining = regs.filter(r => !addedNames.has(r.team_name.toLowerCase()));
+                if (remaining.length === 0) return null;
+                return (
+                  <div className="mb-4">
+                    <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">
+                      Jelentkezők listájából ({remaining.length} fő még nincs hozzáadva)
+                    </p>
+                    <div className="space-y-2">
+                      {remaining.map((r) => (
+                        <div key={r.id} className="flex items-center gap-2 bg-blue-50 border border-blue-200 rounded-xl px-3 py-2">
+                          <input
+                            type="number"
+                            min="1" max="999"
+                            placeholder="Rajt#"
+                            className="w-16 px-2 py-1 border-2 border-gray-300 rounded-lg text-sm text-center focus:border-blue-500 focus:outline-none"
+                            id={`rajtszam-${r.id}`}
+                          />
+                          <span className="flex-1 text-sm font-semibold text-blue-800">{r.team_name}</span>
+                          <select
+                            id={`szektor-${r.id}`}
+                            className="px-2 py-1 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none bg-white">
+                            <option value="">Szektor</option>
+                            <option value="A">A</option>
+                            <option value="B">B</option>
+                            <option value="C">C</option>
+                          </select>
+                          <button
+                            onClick={() => {
+                              const rajtszam = parseInt(document.getElementById('rajtszam-' + r.id)?.value) || null;
+                              const szektor = document.getElementById('szektor-' + r.id)?.value || null;
+                              addCompetitor(r.team_name, rajtszam, szektor);
+                            }}
+                            disabled={competitors.length >= 45}
+                            className="px-3 py-1 bg-green-600 text-white rounded-lg text-xs font-bold hover:bg-green-700 disabled:bg-gray-400 flex items-center gap-1">
+                            <Plus className="w-3 h-3" />Hozzáad
+                          </button>
+                        </div>
+                      ))}
+                    </div>
+                    <div className="border-t border-gray-200 my-3" />
+                  </div>
+                );
+              })()}
+
+              {/* Manuális hozzáadás */}
+              <p className="text-xs font-bold text-gray-400 uppercase tracking-wide mb-2">Manuális hozzáadás</p>
+              <div className="flex gap-2">
+                <input
+                  type="number" min="1" max="999"
+                  value={newRajtszam}
+                  onChange={(e) => setNewRajtszam(e.target.value)}
+                  placeholder="Rajt#"
+                  className="w-16 px-2 py-2 border-2 border-gray-300 rounded-lg text-sm text-center focus:border-blue-500 focus:outline-none"
+                  disabled={competitors.length >= 45} />
+                <input
+                  type="text" value={newName}
+                  onChange={(e) => setNewName(e.target.value)}
                   onKeyPress={(e) => e.key === 'Enter' && addCompetitor()}
                   placeholder="Versenyző neve..."
-                  className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg focus:border-blue-500 focus:outline-none text-sm"
+                  className="flex-1 px-3 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none"
                   disabled={competitors.length >= 45} />
-                <button onClick={addCompetitor} disabled={competitors.length >= 45}
-                  className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center gap-2 text-sm font-semibold">
-                  <Plus className="w-4 h-4" />Hozzáad ({competitors.length}/45)
+                <select
+                  value={newSzektor}
+                  onChange={(e) => setNewSzektor(e.target.value)}
+                  className="px-2 py-2 border-2 border-gray-300 rounded-lg text-sm focus:border-blue-500 focus:outline-none bg-white"
+                  disabled={competitors.length >= 45}>
+                  <option value="">Szektor</option>
+                  <option value="A">A</option>
+                  <option value="B">B</option>
+                  <option value="C">C</option>
+                </select>
+                <button onClick={() => addCompetitor()} disabled={competitors.length >= 45}
+                  className="px-3 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 disabled:bg-gray-400 flex items-center gap-1 text-sm font-semibold">
+                  <Plus className="w-4 h-4" />Hozzáad
                 </button>
               </div>
             </div>
@@ -1151,7 +1233,9 @@ export default function FishingCompetition() {
               <div className="overflow-x-auto">
                 <table className="w-full text-sm">
                   <thead><tr className="bg-gray-100 border-b-2 border-gray-300">
-                    <th className="px-2 py-2 text-center">#</th><th className="px-2 py-2 text-left">Név</th>
+                    <th className="px-2 py-2 text-center">Rajt</th>
+                    <th className="px-2 py-2 text-left">Név</th>
+                    <th className="px-2 py-2 text-center">Szek.</th>
                     <th className="px-2 py-2 text-center">Nagyhal (g)</th><th className="px-2 py-2 text-center">Apróhal (g)</th>
                     <th className="px-2 py-2 text-center">Darab</th><th className="px-2 py-2 text-center">Összesen</th>
                     <th className="px-2 py-2 text-center">Rögzít</th><th className="px-2 py-2 text-center">Törlés</th>
@@ -1164,11 +1248,18 @@ export default function FishingCompetition() {
                       return (
                         <React.Fragment key={c.id}>
                           <tr className={idx % 2 === 0 ? 'bg-white border-b border-gray-200' : 'bg-blue-50 border-b border-gray-200'}>
-                            <td className="px-2 py-2 text-center font-bold text-gray-700">{idx + 1}</td>
+                            <td className="px-2 py-2 text-center font-bold text-gray-600 text-sm">
+                              {c.rajtszam ? <span className="bg-gray-200 px-1.5 py-0.5 rounded font-bold">{c.rajtszam}</span> : <span className="text-gray-300">—</span>}
+                            </td>
                             <td className="px-2 py-2">
                               <span className="font-semibold cursor-pointer hover:text-blue-600" onClick={() => setExpandedAdminId(isExp ? null : c.id)}>
                                 {c.name} {c.measurements.length > 0 && <span className="text-xs text-blue-500">{isExp ? '▲' : '▼'}</span>}
                               </span>
+                            </td>
+                            <td className="px-2 py-2 text-center">
+                              {c.szektor
+                                ? <span className={`text-xs font-bold px-2 py-0.5 rounded-full text-white ${c.szektor === 'A' ? 'bg-blue-500' : c.szektor === 'B' ? 'bg-emerald-500' : 'bg-purple-500'}`}>{c.szektor}</span>
+                                : <span className="text-gray-300 text-xs">—</span>}
                             </td>
                             <td className="px-2 py-2 text-center">
                               {isEdit ? <input type="number" value={nagyhalaInput} onChange={(e) => setNagyhalaInput(e.target.value)} placeholder="0" className="w-16 px-1 py-0.5 border-2 border-blue-500 rounded text-center" />
@@ -1198,7 +1289,7 @@ export default function FishingCompetition() {
                             </td>
                           </tr>
                           {isExp && c.measurements.length > 0 && (
-                            <tr><td colSpan={8} className="p-0">
+                            <tr><td colSpan={10} className="p-0">
                               <div className="bg-green-50 border-t border-b border-green-200 px-4 py-3">
                                 <table className="w-full text-xs"><thead><tr className="text-gray-500 border-b border-green-200">
                                   <th className="text-left py-1">#</th><th className="py-1">Időpont</th>
@@ -1232,7 +1323,7 @@ export default function FishingCompetition() {
                                   })}
                                 </tbody>
                                 <tfoot><tr className="border-t-2 border-green-300 font-bold text-gray-700">
-                                  <td colSpan={2} className="py-1">Összesen:</td>
+                                  <td colSpan={4} className="py-1">Összesen:</td>
                                   <td className="py-1 text-center text-green-700">{c.totalNagyhal} g</td>
                                   <td className="py-1 text-center text-blue-700">{c.totalAprohal} g</td>
                                   <td className="py-1 text-center text-purple-700">{c.totalDarabszam}</td>
