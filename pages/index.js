@@ -1517,40 +1517,6 @@ export default function FishingCompetition() {
       </div>
     );
   }
-
-                                          <td className="py-1 text-center">{m.aprohal > 0 ? <span className="text-blue-700 font-bold">{m.aprohal} g</span> : '-'}</td>
-                                          <td className="py-1 text-center">{m.darabszam > 0 ? <span className="text-purple-700 font-bold">{m.darabszam}</span> : '-'}</td>
-                                          <td className="py-1 text-center font-bold text-yellow-700">{m.nagyhal + m.aprohal} g</td>
-                                        </tr>
-                                      ))}
-                                    </tbody></table>
-                                  </div>
-                                </td></tr>
-                              )}
-                            </React.Fragment>
-                          ))}
-                        </tbody>
-                      </table>
-                    </div>
-                  </div>
-                );
-              })}
-              {competitors.length === 0 && (
-                <div className="bg-white rounded-xl shadow p-8 text-center text-gray-400">
-                  <Fish className="w-10 h-10 mx-auto mb-2 opacity-40" />
-                  <p className="text-sm">A verseny hamarosan kezdődik.</p>
-                </div>
-              )}
-            </div>
-          )}
-
-          <ResultsPanel res={results} showAllResults={showAllResults} setShowAllResults={setShowAllResults} />
-          {user && <VisitorStats pageViews={pageViews} loadPageViews={loadPageViews} />}
-        </div>
-      </div>
-    );
-  }
-
   // ══════════════════════════════════════════════════════════════════════
   // NÉZET: FŐOLDAL
   // ══════════════════════════════════════════════════════════════════════
