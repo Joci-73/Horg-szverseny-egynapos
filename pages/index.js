@@ -367,8 +367,6 @@ export default function FishingCompetition() {
   const [newName, setNewName] = useState('');
   const [newRajtszam, setNewRajtszam] = useState('');
   const [newSzektor, setNewSzektor] = useState('');
-  const [newRajtszam, setNewRajtszam] = useState('');
-  const [newSzektor, setNewSzektor] = useState('');
   const [editingId, setEditingId] = useState(null);
   const [nagyhalaInput, setNagyhalaInput] = useState('');
   const [aprohalaInput, setAprohalaInput] = useState('');
