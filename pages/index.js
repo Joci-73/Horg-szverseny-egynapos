@@ -101,52 +101,97 @@ const VisitorStats = ({ pageViews, loadPageViews }) => (
   </div>
 );
 
-const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => (
-  <div className="grid md:grid-cols-2 gap-4 mb-4">
-    <div className="bg-white rounded-lg shadow-lg p-4">
-      <h3 className="text-lg font-bold mb-3 text-green-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-yellow-500" />Top 3 Legnagyobb Hal</h3>
-      {res.top3Nagyhal.length > 0
-        ? <div className="space-y-2">{res.top3Nagyhal.map((e, i) => (
-            <div key={i} className={placeStyle(i)}>
-              <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-600">{i + 1}.</span><span className="font-semibold">{e.name}</span></div>
-              <span className="font-bold text-green-700 text-lg">{e.weight} g</span>
-            </div>))}</div>
-        : <p className="text-gray-400 text-center py-6 text-sm">Nincs adat</p>}
-    </div>
-    <div className="bg-white rounded-lg shadow-lg p-4">
-      <h3 className="text-lg font-bold mb-3 text-blue-700 flex items-center gap-2"><Trophy className="w-5 h-5 text-blue-500" />Összesített Eredmények</h3>
-      {res.top6Mindosszesen.length > 0 ? (
-        <div>
-          <div className="space-y-2">
-            {res.top6Mindosszesen.slice(0, 6).map((c, i) => (
-              <div key={c.id} className={i < 3 ? placeStyle(i) : 'flex justify-between items-center p-2 rounded bg-gray-50'}>
-                <div className="flex items-center gap-2"><span className="text-xl font-bold text-gray-600">{i + 1}.</span><span className="font-semibold">{c.name}</span></div>
-                <span className="font-bold text-blue-700 text-lg">{c.mindosszesen} g</span>
+const ResultsPanel = ({ res, showAllResults, setShowAllResults }) => {
+  // res = array of { sz, top3Nagyhal, sorted }
+  if (!res || res.length === 0) return null;
+  const hasData = res.some(r => r.top3Nagyhal.length > 0 || r.sorted.length > 0);
+  if (!hasData) return null;
+
+  const MEDAL = ['🥇','🥈','🥉'];
+  const SZ_COLORS = {
+    A: { header: 'from-blue-600 to-blue-700',    badge: 'bg-blue-500',    ring: 'border-blue-300',    text: 'text-blue-700'    },
+    B: { header: 'from-emerald-600 to-emerald-700', badge: 'bg-emerald-500', ring: 'border-emerald-300', text: 'text-emerald-700' },
+    C: { header: 'from-purple-600 to-purple-700', badge: 'bg-purple-500',  ring: 'border-purple-300',  text: 'text-purple-700'  },
+    D: { header: 'from-orange-500 to-orange-600', badge: 'bg-orange-500',  ring: 'border-orange-300',  text: 'text-orange-700'  },
+    __all__: { header: 'from-gray-600 to-gray-700', badge: 'bg-gray-500',  ring: 'border-gray-300',    text: 'text-gray-700'    },
+  };
+
+  return (
+    <div className="mb-4 space-y-4">
+      {res.map(({ sz, top3Nagyhal, sorted }) => {
+        if (top3Nagyhal.length === 0 && sorted.length === 0) return null;
+        const col = SZ_COLORS[sz] || SZ_COLORS.__all__;
+        const label = sz === '__all__' ? '' : `${sz} szektor · `;
+        return (
+          <div key={sz} className={`bg-white rounded-2xl shadow-lg overflow-hidden border-2 ${col.ring}`}>
+            {/* Szektor fejléc */}
+            {sz !== '__all__' && (
+              <div className={`bg-gradient-to-r ${col.header} px-5 py-3 flex items-center gap-3`}>
+                <span className="text-white text-3xl font-black">{sz}</span>
+                <span className="text-white font-bold text-lg">szektor eredményei</span>
               </div>
-            ))}
-          </div>
-          {res.top6Mindosszesen.length > 6 && (
-            <div className="mt-3">
-              <button onClick={() => setShowAllResults(!showAllResults)} className="w-full py-2 text-sm text-blue-600 font-semibold hover:bg-blue-50 rounded border border-blue-200">
-                {showAllResults ? '▲ Kevesebbet' : `▼ Még ${res.top6Mindosszesen.length - 6} versenyző`}
-              </button>
-              {showAllResults && (
-                <div className="space-y-1 mt-2 border-t border-gray-200 pt-2">
-                  {res.top6Mindosszesen.slice(6).map((c, i) => (
-                    <div key={c.id} className="flex justify-between items-center p-2 rounded bg-gray-50 hover:bg-gray-100">
-                      <div className="flex items-center gap-2"><span className="text-sm font-bold text-gray-500">{i + 7}.</span><span className="text-sm font-semibold text-gray-700">{c.name}</span></div>
-                      <span className="font-bold text-blue-600 text-sm">{c.mindosszesen} g</span>
-                    </div>
-                  ))}
-                </div>
-              )}
+            )}
+
+            <div className="grid md:grid-cols-2 gap-0 divide-y md:divide-y-0 md:divide-x divide-gray-100">
+              {/* Top 3 Legnagyobb hal */}
+              <div className="p-4">
+                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <Trophy className="w-4 h-4 text-yellow-500" />{label}Top 3 Legnagyobb Hal
+                </h4>
+                {top3Nagyhal.length > 0 ? (
+                  <div className="space-y-2">
+                    {top3Nagyhal.map((e, i) => (
+                      <div key={i} className={`flex justify-between items-center p-2.5 rounded-xl ${
+                        i === 0 ? 'bg-yellow-50 border-2 border-yellow-300' :
+                        i === 1 ? 'bg-gray-50 border-2 border-gray-300' :
+                                  'bg-orange-50 border-2 border-orange-300'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-xl">{MEDAL[i]}</span>
+                          <span className="font-semibold text-sm">{e.name}</span>
+                        </div>
+                        <span className="font-black text-green-700">{e.weight} g</span>
+                      </div>
+                    ))}
+                  </div>
+                ) : <p className="text-gray-400 text-center py-4 text-sm">Nincs mérés</p>}
+              </div>
+
+              {/* Összesített sorrend */}
+              <div className="p-4">
+                <h4 className="text-sm font-bold text-gray-500 uppercase tracking-wide mb-3 flex items-center gap-2">
+                  <Fish className="w-4 h-4 text-blue-500" />{label}Összesített Sorrend
+                </h4>
+                {sorted.length > 0 ? (
+                  <div className="space-y-2">
+                    {sorted.slice(0, showAllResults ? sorted.length : 6).map((c, i) => (
+                      <div key={c.id} className={`flex justify-between items-center p-2.5 rounded-xl ${
+                        i === 0 ? 'bg-yellow-50 border-2 border-yellow-300' :
+                        i === 1 ? 'bg-gray-50 border-2 border-gray-300' :
+                        i === 2 ? 'bg-orange-50 border-2 border-orange-300' :
+                                  'bg-gray-50 border border-gray-200'}`}>
+                        <div className="flex items-center gap-2">
+                          <span className="text-lg">{i < 3 ? MEDAL[i] : String(i+1) + '.'}</span>
+                          <span className="font-semibold text-sm">{c.name}</span>
+                        </div>
+                        <span className="font-black text-blue-700">{c.mindosszesen} g</span>
+                      </div>
+                    ))}
+                    {sorted.length > 6 && (
+                      <button onClick={() => setShowAllResults(!showAllResults)}
+                        className="w-full py-2 text-xs text-blue-600 font-bold hover:bg-blue-50 rounded-lg border border-blue-200 mt-1">
+                        {showAllResults ? '▲ Kevesebbet' : `▼ Még ${sorted.length - 6} versenyző`}
+                      </button>
+                    )}
+                  </div>
+                ) : <p className="text-gray-400 text-center py-4 text-sm">Nincs adat</p>}
+              </div>
             </div>
-          )}
-        </div>
-      ) : <p className="text-gray-400 text-center py-6 text-sm">Nincs adat</p>}
+          </div>
+        );
+      })}
     </div>
-  </div>
-);
+  );
+};
 
 // ── Versenyesemény kártya a főoldalon ─────────────────────────────────
 // Egy verseny = egy kártya. Szektorok a verseny szektorok mezőjéből.
@@ -778,21 +823,22 @@ export default function FishingCompetition() {
     } else alert('Másold ki a böngésző címsorából az URL-t!');
   };
 
-  const results = useMemo(() => {
-    const allEntries = [];
-    competitors.forEach(c => { (c.nagyhals || []).forEach(w => allEntries.push({ name: c.name, weight: w })); });
-    const top3Nagyhal = allEntries.sort((a, b) => b.weight - a.weight).slice(0, 3);
-    const top6Mindosszesen = [...competitors].filter(c => c.mindosszesen > 0).sort((a, b) => b.mindosszesen - a.mindosszesen);
-    return { top3Nagyhal, top6Mindosszesen };
-  }, [competitors]);
+  // Szektoronkénti eredmény számítás
+  const buildSzektorResults = (compList, activeSegs) => {
+    const hasSzektorok = activeSegs && activeSegs.length > 0;
+    const segments = hasSzektorok ? activeSegs : ['__all__'];
+    return segments.map(sz => {
+      const list = sz === '__all__' ? compList : compList.filter(c => c.szektor === sz);
+      const allEntries = [];
+      list.forEach(c => { (c.nagyhals || []).forEach(w => allEntries.push({ name: c.name, szektor: c.szektor, weight: w })); });
+      const top3Nagyhal = [...allEntries].sort((a, b) => b.weight - a.weight).slice(0, 3);
+      const sorted = [...list].filter(c => c.mindosszesen > 0).sort((a, b) => b.mindosszesen - a.mindosszesen);
+      return { sz, top3Nagyhal, sorted };
+    });
+  };
 
-  const archivedResults = useMemo(() => {
-    const allEntries = [];
-    archivedCompetitors.forEach(c => { (c.nagyhals || []).forEach(w => allEntries.push({ name: c.name, weight: w })); });
-    const top3Nagyhal = allEntries.sort((a, b) => b.weight - a.weight).slice(0, 3);
-    const top6Mindosszesen = [...archivedCompetitors].filter(c => c.mindosszesen > 0).sort((a, b) => b.mindosszesen - a.mindosszesen);
-    return { top3Nagyhal, top6Mindosszesen };
-  }, [archivedCompetitors]);
+  const results = useMemo(() => buildSzektorResults(competitors, szektorok), [competitors, szektorok]);
+  const archivedResults = useMemo(() => buildSzektorResults(archivedCompetitors, []), [archivedCompetitors]);
 
   // Minden verseny külön kártya (egy verseny = egy kártya, szektorok belül)
   const groupedCompetitions = useMemo(() => {
@@ -1613,7 +1659,7 @@ export default function FishingCompetition() {
                 key={gi}
                 eventName={group.name}
                 competitions={group.comps}
-                onGoToResults={() => setView('list')}
+                onGoToResults={() => loadCompetition(group.comps[0].id)}
                 isArchived={false}
                 user={user}
                 onRegister={handleRegistration}
