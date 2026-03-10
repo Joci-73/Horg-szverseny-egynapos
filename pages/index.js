@@ -15,7 +15,7 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 // Regisztrálj: https://www.emailjs.com (ingyenes, 200 email/hó)
 // Majd töltsd ki az alábbi értékeket az EmailJS dashboardból:
 const EMAILJS_SERVICE_ID  = 'service_wu00jmp';
-const EMAILJS_TEMPLATE_ID = 'templates_wueh31s';
+const EMAILJS_TEMPLATE_ID = 'template_nu9ip5j';
 const EMAILJS_PUBLIC_KEY  = 'V012FAAyECRsTZmXp';
 // EmailJS template változók: {{verseny_nev}}, {{jelentkezo_nev}}, {{telefon}}
 
