@@ -17,29 +17,42 @@ const supabase = createClient(supabaseUrl, supabaseKey);
 const EMAILJS_SERVICE_ID  = 'service_wu00jmp';
 const EMAILJS_TEMPLATE_ID = 'template_nu9ip5j';
 const EMAILJS_PUBLIC_KEY  = 'V012FAAyECRsTZmXp';
-// EmailJS template változók: {{verseny_nev}}, {{jelentkezo_nev}}, {{telefon}}
+const EMAILJS_TO_EMAIL    = 'horgaszathonlap@gmail.com'; // ← IDE ÍRD BE A SAJÁT EMAIL CÍMED
+// EmailJS template változók: {{verseny_nev}}, {{jelentkezo_nev}}, {{telefon}}, {{to_email}}
 
 const sendRegistrationEmail = async (versenyNev, jelentkezoNev, telefon) => {
-  if (!EMAILJS_SERVICE_ID || EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') return; // nincs konfigurálva
+  if (!EMAILJS_SERVICE_ID || EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') {
+    console.log('EmailJS nincs konfigurálva, email küldés kihagyva.');
+    return;
+  }
   try {
+    const payload = {
+      service_id:  EMAILJS_SERVICE_ID,
+      template_id: EMAILJS_TEMPLATE_ID,
+      user_id:     EMAILJS_PUBLIC_KEY,   // régebbi API
+      accessToken: EMAILJS_PUBLIC_KEY,   // újabb API
+      template_params: {
+        verseny_nev:     versenyNev,
+        jelentkezo_nev:  jelentkezoNev,
+        telefon:         telefon,
+        datum:           new Date().toLocaleString('hu-HU'),
+        to_email:        EMAILJS_TO_EMAIL,
+      },
+    };
+    console.log('EmailJS küldés...', { versenyNev, jelentkezoNev });
     const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        service_id:  EMAILJS_SERVICE_ID,
-        template_id: EMAILJS_TEMPLATE_ID,
-        user_id:     EMAILJS_PUBLIC_KEY,
-        template_params: {
-          verseny_nev:     versenyNev,
-          jelentkezo_nev:  jelentkezoNev,
-          telefon:         telefon,
-          datum:           new Date().toLocaleString('hu-HU'),
-        },
-      }),
+      body: JSON.stringify(payload),
     });
-    if (!res.ok) console.warn('EmailJS hiba:', await res.text());
+    const text = await res.text();
+    if (res.ok) {
+      console.log('Email sikeresen elküldve:', text);
+    } else {
+      console.error('EmailJS API hiba', res.status, text);
+    }
   } catch (e) {
-    console.warn('Email küldés sikertelen:', e);
+    console.error('Email küldés kivétel:', e);
   }
 };
 
