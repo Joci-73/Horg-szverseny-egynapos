@@ -11,6 +11,38 @@ const supabaseUrl = 'https://scijtstwpbgxtsdqzowc.supabase.co';
 const supabaseKey = 'sb_publishable_jVuKo_UCsRvxdGbmYvGo-Q_cib0YWVv';
 const supabase = createClient(supabaseUrl, supabaseKey);
 
+// ── EmailJS konfiguráció ──────────────────────────────────────────────
+// Regisztrálj: https://www.emailjs.com (ingyenes, 200 email/hó)
+// Majd töltsd ki az alábbi értékeket az EmailJS dashboardból:
+const EMAILJS_SERVICE_ID  = 'service_wu00jmp';
+const EMAILJS_TEMPLATE_ID = 'templates_wueh31s';
+const EMAILJS_PUBLIC_KEY  = 'V012FAAyECRsTZmXp';
+// EmailJS template változók: {{verseny_nev}}, {{jelentkezo_nev}}, {{telefon}}
+
+const sendRegistrationEmail = async (versenyNev, jelentkezoNev, telefon) => {
+  if (!EMAILJS_SERVICE_ID || EMAILJS_SERVICE_ID === 'YOUR_SERVICE_ID') return; // nincs konfigurálva
+  try {
+    const res = await fetch('https://api.emailjs.com/api/v1.0/email/send', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        service_id:  EMAILJS_SERVICE_ID,
+        template_id: EMAILJS_TEMPLATE_ID,
+        user_id:     EMAILJS_PUBLIC_KEY,
+        template_params: {
+          verseny_nev:     versenyNev,
+          jelentkezo_nev:  jelentkezoNev,
+          telefon:         telefon,
+          datum:           new Date().toLocaleString('hu-HU'),
+        },
+      }),
+    });
+    if (!res.ok) console.warn('EmailJS hiba:', await res.text());
+  } catch (e) {
+    console.warn('Email küldés sikertelen:', e);
+  }
+};
+
 // ── Segédfüggvények ───────────────────────────────────────────────────
 const safeField = (val) => {
   if (val === null || val === undefined) return '';
@@ -398,48 +430,106 @@ const RegRow = ({ reg, szektorok, defaultSzektor, onAdd, disabled }) => {
   );
 };
 
-const RegistrationModal = ({ competitionId, onClose, onSubmit }) => {
+const RegistrationModal = ({ competitionId, competitionTitle, onClose, onSubmit }) => {
   const [teamName, setTeamName] = useState('');
+  const [phone, setPhone] = useState('');
   const [submitting, setSubmitting] = useState(false);
+  const [done, setDone] = useState(false);
   const [error, setError] = useState('');
 
+  // Telefonszám formázás: csak számok és +
+  const handlePhone = (v) => {
+    const cleaned = v.replace(/[^0-9+\-\s]/g, '');
+    setPhone(cleaned);
+  };
+
   const handleSubmit = async () => {
-    if (!teamName.trim()) { setError('Add meg a csapat nevét!'); return; }
+    if (!teamName.trim()) { setError('Add meg a neved!'); return; }
+    if (!phone.trim() || phone.replace(/\D/g, '').length < 8) {
+      setError('Adj meg egy érvényes telefonszámot!'); return;
+    }
     setSubmitting(true);
     setError('');
     try {
-      await onSubmit(competitionId, teamName.trim());
-      onClose();
+      // 1. Mentés az adatbázisba (csak név, telefonszám NEM kerül mentésre)
+      await onSubmit(competitionId, teamName.trim(), phone.trim());
+      setDone(true);
     } catch (err) {
       setError('Hiba a jelentkezés során: ' + err.message);
     } finally { setSubmitting(false); }
   };
+
+  if (done) return (
+    <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm text-center">
+        <div className="w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-4">
+          <CheckCircle className="w-9 h-9 text-green-600" />
+        </div>
+        <h2 className="text-xl font-bold text-gray-800 mb-2">Sikeres jelentkezés!</h2>
+        <p className="text-sm text-gray-500 mb-1">Neved felkerült a nevezési listára.</p>
+        <p className="text-xs text-gray-400 mb-5">A szervező értesítést kapott a jelentkezésedről.</p>
+        <button onClick={onClose} className="w-full py-3 bg-green-600 text-white rounded-xl font-bold text-sm hover:bg-green-700">
+          Bezárás
+        </button>
+      </div>
+    </div>
+  );
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 flex items-center justify-center z-50 p-4">
       <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-sm">
         <div className="flex items-center justify-between mb-4">
           <h2 className="text-lg font-bold text-gray-800 flex items-center gap-2">
-            <Fish className="w-5 h-5 text-blue-600" />Jelentkezés versenyre
+            <Fish className="w-5 h-5 text-blue-600" />Jelentkezés
           </h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600"><X className="w-5 h-5" /></button>
         </div>
-        <p className="text-sm text-gray-500 mb-4">A neved megjelenik a verseny kiírásában a többi jelentkező között.</p>
-        <input
-          type="text"
-          value={teamName}
-          onChange={(e) => setTeamName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
-          placeholder="pl.: Pontyos Pál"
-          className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm mb-2"
-          autoFocus
-        />
-        {error && <p className="text-red-600 text-xs mb-2">{error}</p>}
-        <div className="flex gap-3 mt-4">
-          <button onClick={onClose} className="flex-1 py-2 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold text-sm">Mégse</button>
+
+        {competitionTitle && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl px-3 py-2 mb-4">
+            <p className="text-xs text-blue-500 font-semibold uppercase tracking-wide">Verseny</p>
+            <p className="text-sm font-bold text-blue-800">{competitionTitle}</p>
+          </div>
+        )}
+
+        <div className="space-y-3">
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">Neved <span className="text-red-500">*</span></label>
+            <input
+              type="text"
+              value={teamName}
+              onChange={(e) => setTeamName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              placeholder="pl.: Pontyos Pál"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm"
+              autoFocus
+            />
+          </div>
+          <div>
+            <label className="block text-xs font-bold text-gray-600 mb-1">
+              Telefonszám <span className="text-red-500">*</span>
+            </label>
+            <input
+              type="tel"
+              value={phone}
+              onChange={(e) => handlePhone(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && handleSubmit()}
+              placeholder="+36 30 123 4567"
+              className="w-full px-4 py-3 border-2 border-gray-300 rounded-xl focus:border-blue-500 focus:outline-none text-sm"
+            />
+            <p className="text-xs text-gray-400 mt-1 flex items-center gap-1">
+              <Lock className="w-3 h-3" />A telefonszámot csak a szervező kapja meg, nem tároljuk.
+            </p>
+          </div>
+        </div>
+
+        {error && <p className="text-red-600 text-xs mt-3 bg-red-50 px-3 py-2 rounded-lg">{error}</p>}
+
+        <div className="flex gap-3 mt-5">
+          <button onClick={onClose} className="flex-1 py-2.5 bg-gray-100 text-gray-700 rounded-xl hover:bg-gray-200 font-semibold text-sm">Mégse</button>
           <button onClick={handleSubmit} disabled={submitting}
-            className="flex-1 py-2 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm disabled:bg-gray-400">
-            {submitting ? 'Küldés...' : 'Jelentkezés ✓'}
+            className="flex-1 py-2.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold text-sm disabled:bg-gray-400 flex items-center justify-center gap-2">
+            {submitting ? <><RefreshCw className="w-4 h-4 animate-spin" />Küldés...</> : 'Jelentkezés ✓'}
           </button>
         </div>
       </div>
@@ -747,9 +837,13 @@ export default function FishingCompetition() {
     }
   };
 
-  const submitRegistration = async (compId, teamName) => {
+  const submitRegistration = async (compId, teamName, phone) => {
+    // Csak a nevet mentjük — telefonszám NEM kerül az adatbázisba
     const { error } = await supabase.from('registrations').insert([{ competition_id: compId, team_name: teamName }]);
     if (error) throw error;
+    // Email küldés a szervezőnek (phone csak memóriában él, nem mentjük)
+    const versenyNev = competitions.find(c => c.id === compId)?.title || 'Verseny';
+    await sendRegistrationEmail(versenyNev, teamName, phone);
     await loadCompetitions();
   };
 
@@ -1572,6 +1666,7 @@ export default function FishingCompetition() {
       {registrationModal && (
         <RegistrationModal
           competitionId={registrationModal}
+          competitionTitle={competitions.find(c => c.id === registrationModal)?.title || ''}
           onClose={() => setRegistrationModal(null)}
           onSubmit={submitRegistration}
         />
